@@ -841,7 +841,7 @@ def render_demographic_and_contacts_tab(
             matrices=contact_matrices,
             groups=population.Nk_names,
             facecolor="#0c1019",
-            cmap="oranges",
+            cmap=("#9fb6d4", "#e9e4dd", "#e8933f"),  # light blue -> neutral -> orange
         )
 
     # Contacts-by-setting summary (age-mixing story across home/school/work/community)
