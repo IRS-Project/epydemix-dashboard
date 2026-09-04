@@ -226,20 +226,15 @@ def _normalize_peak(a) -> np.ndarray:
     return a / m if m > 0 else a
 
 
-def curve_shape_distance(obs_weekly, df_trans, model: str, mode: str = "weekly") -> float:
-    """Scale-free distance between an observed weekly case series and the modeled
-    incidence *shape*, over their overlapping window. This is what a time series
-    adds over a cross-tab: it constrains growth rate, peak timing and seasonality
-    (hence R₀), which shares/age-distributions cannot.
+def _shape_distance(obs, mod, mode: str = "weekly") -> float:
+    """Scale-free distance between an observed and a modeled weekly series over
+    their overlapping window.
 
-    mode="weekly": peak-normalise the weekly curves; score = RMSE + peak-week
-        timing penalty (rewards matching the epidemic peak).
-    mode="cumulative": cumulate then normalise each curve to its final total
-        (a 0→1 S-curve); score = RMSE of the normalised cumulatives (rewards
-        matching *when* incidence accrues; smoother/less noise-sensitive, no peak
-        penalty since a cumulative's maximum is always its last point)."""
-    obs = np.clip(np.asarray(obs_weekly, dtype=float), 0.0, None)
-    mod = weekly_incidence_from_trans(df_trans, model)
+    mode="weekly": peak-normalise both; score = RMSE + peak-week timing penalty.
+    mode="cumulative": cumulate then normalise to the final total (0→1 S-curve);
+        score = RMSE of the normalised cumulatives (no peak penalty)."""
+    obs = np.clip(np.asarray(obs, dtype=float), 0.0, None)
+    mod = np.clip(np.asarray(mod, dtype=float), 0.0, None)
     if obs.size == 0 or mod.size == 0 or obs.max() <= 0 or mod.max() <= 0:
         return 1.0
     L = min(len(obs), len(mod))
@@ -255,6 +250,22 @@ def curve_shape_distance(obs_weekly, df_trans, model: str, mode: str = "weekly")
     rmse = float(np.sqrt(np.mean((o - m) ** 2)))
     peak_pen = abs(int(np.argmax(o)) - int(np.argmax(m))) / max(1, L - 1)
     return rmse + 0.5 * peak_pen
+
+
+def curve_shape_distance(obs_weekly, df_trans, model: str, mode: str = "weekly") -> float:
+    """Distance between an observed weekly *case* series and the modeled weekly
+    incidence shape. This is what a time series adds over a cross-tab: it
+    constrains growth rate, peak timing and seasonality (hence R₀)."""
+    return _shape_distance(obs_weekly, weekly_incidence_from_trans(df_trans, model), mode)
+
+
+def hosp_curve_distance(obs_hosp_weekly, df_trans, model: str,
+                        hosp_params: dict | None = None, mode: str = "weekly") -> float:
+    """Distance between an observed weekly *hospitalization* series and the modeled
+    weekly total hospitalizations (from the hospitalization observation model)."""
+    from engine.hospitalization import weekly_hosp_total_from_trans
+    mod = weekly_hosp_total_from_trans(df_trans, hosp_params, model)
+    return _shape_distance(obs_hosp_weekly, mod, mode)
 
 
 # ----------------------------------------------------------------------------
@@ -330,6 +341,12 @@ def abc_smc_calibrate(base_scenario, raw, run_fn, *, n_particles=40, n_rounds=3,
     weekly_mode = base_scenario.get("weekly_mode", "weekly")
     model_name = base_scenario.get("model")
 
+    # Optional observed weekly-hospitalization curve target (user-supplied).
+    hosp = base_scenario.get("hosp_target") or None
+    hosp_weight = float(base_scenario.get("hosp_weight", 1.0))
+    hosp_mode = base_scenario.get("hosp_mode", "weekly")
+    hosp_params = base_scenario.get("hosp_params")
+
     def report(frac, msg):
         if progress is not None:
             try:
@@ -343,6 +360,9 @@ def abc_smc_calibrate(base_scenario, raw, run_fn, *, n_particles=40, n_rounds=3,
             d = fit_error(obs, modeled_case_summary(trans))["score"]
             if weekly:
                 d += weekly_weight * curve_shape_distance(weekly, trans, model_name, mode=weekly_mode)
+            if hosp:
+                d += hosp_weight * hosp_curve_distance(hosp, trans, model_name,
+                                                       hosp_params=hosp_params, mode=hosp_mode)
             return float(d) if np.isfinite(d) else 1e6
         except Exception:
             return 1e6

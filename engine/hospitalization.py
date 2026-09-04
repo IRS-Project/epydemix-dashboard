@@ -111,6 +111,16 @@ def hospitalizations_from_trans(df_trans, params: dict | None = None,
     return pd.DataFrame(rows)
 
 
+def weekly_hosp_total_from_trans(df_trans, params: dict | None = None,
+                                 model: str = "SEIRS (Pertussis)") -> np.ndarray:
+    """Modeled weekly total hospitalizations (all output age bands), for use as a
+    calibration curve target."""
+    daily = hospitalizations_from_trans(df_trans, params, model)
+    daily["week"] = (daily["t"] - 1) // 7
+    wk = daily.groupby("week", as_index=False)["hosp"].sum().sort_values("week")
+    return wk["hosp"].to_numpy(dtype=float)
+
+
 def hospitalization_summary(df_trans, params: dict | None = None,
                             model: str = "SEIRS (Pertussis)") -> pd.DataFrame:
     """Total hospitalizations per output age band (+ a 'total' row)."""

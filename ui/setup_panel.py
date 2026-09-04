@@ -276,6 +276,11 @@ def render_observed_panel(model: str, geography: str) -> None:
                 f"({', '.join(str(y) for y in _wm['years']) or 'all years'}) — "
                 f"weight {st.session_state.get('_weekly_weight', 1.0):g}. This sharply "
                 "tightens the R₀ posterior.")
+    if st.session_state.get("_hosp_fit_on") and st.session_state.get("_hosp_meta"):
+        _hm = st.session_state["_hosp_meta"]
+        st.info(f"Hospitalization fit **active**: {_hm['n']} weeks from {_hm['name']} — "
+                f"weight {st.session_state.get('_hosp_weight', 1.0):g}. Configure in the "
+                "Hospitalizations tab.")
     ac = st.columns(2)
     with ac[0]:
         abc_particles = st.slider("Particles", 20, 80, 40, 10,
@@ -303,6 +308,14 @@ def render_observed_panel(model: str, geography: str) -> None:
             base["weekly_mode"] = ("cumulative"
                                    if str(st.session_state.get("_weekly_basis", "")).startswith("Cumulative")
                                    else "weekly")
+        # Attach the observed-hospitalization curve target if enabled.
+        if st.session_state.get("_hosp_fit_on") and st.session_state.get("_hosp_meta"):
+            base["hosp_target"] = st.session_state["_hosp_meta"]["series"]
+            base["hosp_weight"] = float(st.session_state.get("_hosp_weight", 1.0))
+            base["hosp_mode"] = ("cumulative"
+                                 if str(st.session_state.get("_hosp_basis", "")).startswith("Cumulative")
+                                 else "weekly")
+            base["hosp_params"] = st.session_state.get("hosp_params")
         old_nsim = _runmod.N_SIM
         _runmod.N_SIM = 3  # reduced replicates during the search
         try:
