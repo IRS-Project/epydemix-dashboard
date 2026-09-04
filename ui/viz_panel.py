@@ -330,35 +330,103 @@ def render_compartment_timeseries(compartments, selected_ids, scenarios, results
     with col1:
         comp_idx = np.where(np.array(compartments) == "I")[0][0]
         comp = st.selectbox("Compartment", options=compartments, index=int(comp_idx))
-    
+
     with col2:
         total_ages = ["total"] + DEFAULT_AGE_GROUPS
         age = st.selectbox("Age group", options=total_ages, index=0)
+
+    band_choice = st.radio(
+        "Uncertainty band",
+        options=["None", "50%", "90%", "95%"],
+        index=2,
+        horizontal=True,
+        help="Shaded percentile band around the median across the stochastic replicates: "
+             "50% = 25th–75th, 90% = 5th–95th, 95% = 2.5th–97.5th.",
+    )
+    _BANDS = {"50%": (0.25, 0.75), "90%": (0.05, 0.95), "95%": (0.025, 0.975)}
 
     # ---- Prepare long dataframe for plotting
     series_col = f"{comp}_{age}" if age != "" else comp
 
     rows = []
+    band_rows = []
     for sid in selected_ids:
         df = results[sid]["compartments"]
         if series_col not in df.columns:
             continue  # should not happen due to intersection logic
-        name = scenarios[sid].get("name", sid)
-
-        cfg = scenarios[sid]["config"]
-        label = f"{name}" 
+        label = scenarios[sid].get("name", sid)
 
         tmp = df[["t", series_col]].copy()
         tmp.rename(columns={series_col: "value"}, inplace=True)
         tmp["scenario"] = label
         rows.append(tmp)
 
+        # Single shaded band (selected level) around the median
+        ci = results[sid].get("compartments_ci")
+        if band_choice != "None" and ci is not None and series_col in ci.columns and "quantile" in ci.columns:
+            qlo, qhi = _BANDS[band_choice]
+            lo = ci[np.isclose(ci["quantile"], qlo)][["t", series_col]].rename(columns={series_col: "lo"})
+            hi = ci[np.isclose(ci["quantile"], qhi)][["t", series_col]].rename(columns={series_col: "hi"})
+            bnd = lo.merge(hi, on="t")
+            bnd["scenario"] = label
+            band_rows.append(bnd)
+
     plot_df = pd.concat(rows, ignore_index=True)
 
     series_col_label = series_col.replace("_", " (") + ")"
-    st.caption(f"Showing: {series_col_label}")
 
-    chart = (
+    # ---- Posterior-predictive (parameter-uncertainty) band from an ABC-SMC run.
+    # Global (single calibrated model), drawn once in a distinct dashed orange style.
+    pp = st.session_state.get("_abc_ppc")
+    pp_layers = []
+    pp_caption = ""
+    if pp is not None and isinstance(pp.get("compartments_pp"), pd.DataFrame):
+        cpp = pp["compartments_pp"]
+        pcols = st.columns([0.45, 0.55])
+        with pcols[0]:
+            pp_on = st.checkbox(
+                "Overlay ABC posterior-predictive band", value=True,
+                help="Parameter-uncertainty band built from the ABC-SMC posterior "
+                     "(parameter sets resampled from the posterior, each simulated). "
+                     "Distinct from the stochastic band above, which fixes the "
+                     "parameters and varies only the random seed.",
+            )
+        with pcols[1]:
+            pp_level = st.radio(
+                "Posterior band level", ["50%", "90%", "95%"], index=2,
+                horizontal=True, key="_pp_band_level", label_visibility="collapsed",
+            )
+        if pp_on and series_col in cpp.columns and "quantile" in cpp.columns:
+            qlo, qhi = _BANDS[pp_level]
+            plo = cpp[np.isclose(cpp["quantile"], qlo)][["t", series_col]].rename(columns={series_col: "lo"})
+            phi = cpp[np.isclose(cpp["quantile"], qhi)][["t", series_col]].rename(columns={series_col: "hi"})
+            pmed = cpp[np.isclose(cpp["quantile"], 0.5)][["t", series_col]].rename(columns={series_col: "med"})
+            pband = plo.merge(phi, on="t")
+            pp_area = (
+                alt.Chart(pband)
+                .mark_area(opacity=0.18, color="#e8833a")
+                .encode(
+                    x=alt.X("t:Q", title="Day"),
+                    y=alt.Y("lo:Q", title=series_col_label),
+                    y2="hi:Q",
+                    tooltip=[alt.Tooltip("lo:Q", title="Posterior lo"),
+                             alt.Tooltip("hi:Q", title="Posterior hi")],
+                )
+            )
+            pp_med = (
+                alt.Chart(pmed)
+                .mark_line(strokeDash=[5, 3], color="#e8833a", strokeWidth=2)
+                .encode(x="t:Q", y="med:Q",
+                        tooltip=[alt.Tooltip("med:Q", title="Posterior median")])
+            )
+            pp_layers = [pp_area, pp_med]
+            pp_caption = f"  ·  dashed orange = posterior-predictive {pp_level} band ({pp['n_draws']} draws)"
+
+    st.caption(f"Showing: {series_col_label} (median line)"
+               + (f"  ·  shaded = {band_choice} band" if band_rows else "")
+               + pp_caption)
+
+    line = (
         alt.Chart(plot_df)
         .mark_line()
         .encode(
@@ -367,9 +435,103 @@ def render_compartment_timeseries(compartments, selected_ids, scenarios, results
             color=alt.Color("scenario:N", title="Scenario", scale=alt.Scale(scheme="set2")),
             tooltip=["scenario:N", "t:Q", "value:Q"],
         )
-        .interactive()
     )
+
+    layers = []
+    # Posterior-predictive band underneath (parameter uncertainty)
+    if pp_layers:
+        layers.append(pp_layers[0])
+    if band_rows:
+        band_df = pd.concat(band_rows, ignore_index=True)
+        area = (
+            alt.Chart(band_df)
+            .mark_area(opacity=0.22)
+            .encode(
+                x=alt.X("t:Q", title="Day"),
+                y=alt.Y("lo:Q", title=series_col_label),
+                y2="hi:Q",
+                color=alt.Color("scenario:N", title="Scenario", scale=alt.Scale(scheme="set2"), legend=None),
+                tooltip=["scenario:N", "t:Q", alt.Tooltip("lo:Q", title="Lower"), alt.Tooltip("hi:Q", title="Upper")],
+            )
+        )
+        layers.append(area)
+    layers.append(line)
+    # Posterior-predictive median (dashed) on top
+    if len(pp_layers) > 1:
+        layers.append(pp_layers[1])
+
+    chart = alt.layer(*layers).interactive()
     st.altair_chart(chart, use_container_width=True)
+
+
+def _metric_ci_bounds(selected_ids, scenarios, results, metric, model, qlo, qhi):
+    """Per-(scenario, age band) lower/upper bounds for a metric at the requested
+    quantiles, computed from the stored compartment/transition quantile frames.
+    Returns a DataFrame [scenario, age_group, ci_lo, ci_hi] (empty if unavailable).
+    Timing metrics (peak_day) are not supported and yield no rows."""
+    ages = DEFAULT_AGE_GROUPS
+    idx = {a: i for i, a in enumerate(ages)}
+    out = []
+
+    def q_series(df, col, q):
+        if df is None or "quantile" not in df.columns or col not in df.columns:
+            return None
+        return df[np.isclose(df["quantile"], q)][col].to_numpy()
+
+    for sid in selected_ids:
+        name = scenarios[sid].get("name", sid)
+        cfg = scenarios[sid].get("config", {})
+        pop = cfg.get("population")
+        comp_ci = results[sid].get("compartments_ci")
+        trans_ci = results[sid].get("transitions_ci")
+        if pop is None:
+            continue
+        Nk = pop.Nk
+        for ag in ages + ["total"]:
+            n = float(Nk.sum()) if ag == "total" else float(Nk[idx[ag]])
+
+            def peak(q):
+                I = q_series(comp_ci, f"I_{ag}", q)
+                if I is None:
+                    return None
+                Ip = q_series(comp_ci, f"Ip_{ag}", q) if model == "SEIRS (Pertussis)" else None
+                base = (I + Ip) if Ip is not None else I
+                return float(base.max())
+
+            def new_infections(q):
+                E = q_series(trans_ci, f"E_to_I_{ag}", q)
+                if E is None:
+                    return None
+                Ep = q_series(trans_ci, f"Ep_to_Ip_{ag}", q) if model == "SEIRS (Pertussis)" else None
+                s = (E + Ep) if Ep is not None else E
+                return float(s.sum())
+
+            def h_sum(q):
+                H = q_series(comp_ci, f"H_{ag}", q)
+                return float(H.sum()) if H is not None else None
+
+            lo = hi = None
+            if metric == "peak_amplitude":
+                lo, hi = peak(qlo), peak(qhi)
+            elif metric == "total_infections":
+                lo, hi = new_infections(qlo), new_infections(qhi)
+            elif metric == "attack_rate":
+                a, b = new_infections(qlo), new_infections(qhi)
+                if a is not None and n > 0:
+                    lo, hi = 100.0 * a / n, 100.0 * b / n
+            elif metric == "hospitalizations":
+                lo, hi = h_sum(qlo), h_sum(qhi)
+            elif metric == "hospitalization_rate":
+                a, b = h_sum(qlo), h_sum(qhi)
+                if a is not None and n > 0:
+                    lo, hi = 100.0 * a / n, 100.0 * b / n
+
+            if lo is not None and hi is not None:
+                if lo > hi:
+                    lo, hi = hi, lo
+                out.append({"scenario": name, "age_group": ag, "ci_lo": lo, "ci_hi": hi})
+
+    return pd.DataFrame(out)
 
 
 def render_metrics_tab(primary_id, selected_ids, scenarios, results):
@@ -434,18 +596,36 @@ def render_metrics_tab(primary_id, selected_ids, scenarios, results):
     metrics = metrics.copy()
     metrics["scenario_label"] = metrics["scenario"].astype(str)
 
-    chart = (
+    # Optional percentile error bars (Absolute view; count/rate metrics only)
+    _QMAP = {"50%": (0.25, 0.75), "90%": (0.05, 0.95), "95%": (0.025, 0.975)}
+    _CI_METRICS = {"attack_rate", "total_infections", "peak_amplitude",
+                   "hospitalizations", "hospitalization_rate"}
+    ci_level = st.radio(
+        "Uncertainty interval (error bars)",
+        options=["None", "50%", "90%", "95%"],
+        index=2,
+        horizontal=True,
+        help="Adds percentile error bars to each bar (Absolute view only). 50% = 25th–75th, "
+             "90% = 5th–95th, 95% = 2.5th–97.5th, across the stochastic replicates. Not available "
+             "for Peak Prevalence Day.",
+    )
+    show_err = (view == "Absolute" and ci_level != "None" and metric in _CI_METRICS)
+    if show_err:
+        qlo, qhi = _QMAP[ci_level]
+        ci_bounds = _metric_ci_bounds(selected_ids, scenarios, results, metric, model, qlo, qhi)
+        if ci_bounds is not None and not ci_bounds.empty:
+            metrics = metrics.merge(ci_bounds, on=["scenario", "age_group"], how="left")
+        else:
+            show_err = False
+
+    bar = (
         alt.Chart(metrics)
         .mark_bar()
         .encode(
-            x=alt.X(
-                "age_group:N", 
-                title="Age group", 
-                sort=DEFAULT_AGE_GROUPS + ["total"]
-            ),
+            x=alt.X("age_group:N", title="Age group", sort=DEFAULT_AGE_GROUPS + ["total"]),
             y=alt.Y(f"{value_col}:Q", title=y_title),
             color=alt.Color("scenario:N", title="Scenario", scale=alt.Scale(scheme="set2")),
-            xOffset="scenario:N",  
+            xOffset="scenario:N",
             tooltip=[
                 "scenario:N",
                 "age_group:N",
@@ -453,6 +633,23 @@ def render_metrics_tab(primary_id, selected_ids, scenarios, results):
             ],
         )
     )
+
+    chart = bar
+    if show_err and "ci_lo" in metrics.columns:
+        err = (
+            alt.Chart(metrics)
+            .mark_rule(strokeWidth=1.6, color="#5f6b7a")
+            .encode(
+                x=alt.X("age_group:N", sort=DEFAULT_AGE_GROUPS + ["total"]),
+                xOffset="scenario:N",
+                y=alt.Y("ci_lo:Q"),
+                y2="ci_hi:Q",
+                tooltip=["scenario:N", "age_group:N",
+                         alt.Tooltip("ci_lo:Q", title="Lower"), alt.Tooltip("ci_hi:Q", title="Upper")],
+            )
+        )
+        chart = alt.layer(bar, err)
+        st.caption(f"Error bars: {ci_level} interval across stochastic replicates.")
 
     st.altair_chart(chart, use_container_width=True)
 
