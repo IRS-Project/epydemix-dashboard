@@ -1,0 +1,33 @@
+# name: Lane County, Oregon — pertussis cases
+# geography_hint: United_States__Oregon__Lane_County
+# note: Cumulative confirmed pertussis cases by age and vaccination-up-to-date status.
+# source: Lane County pertussis case line-list, provided by the SOAR/IRS team.
+age_label,No,Unknown,Yes
+1,16,0,13
+2,12,0,10
+3,3,0,9
+4,9,0,1
+5,4,1,4
+6,1,1,7
+7,5,0,7
+8,6,0,7
+9,4,0,10
+10,8,1,18
+11,22,1,8
+12,8,1,8
+13,10,0,9
+14,4,0,15
+15,6,1,14
+16,2,0,35
+17,1,1,38
+18,3,0,21
+19,3,0,19
+20,3,2,9
+21,4,1,9
+22-24,3,2,7
+25-29,3,2,4
+30-34,3,0,4
+35-39,2,0,9
+40-44,4,1,6
+45-49,2,2,2
+50+,9,1,8

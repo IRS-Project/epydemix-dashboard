@@ -12,7 +12,14 @@
 # Ages 1-21 are single years; older rows are explicit bands. "50+" is not split
 # into 50-64 / 65+ in the source data.
 
+import csv
+import glob
+import os
+
 from constants import DEFAULT_AGE_GROUPS  # ["0-4","5-19","20-49","50-64","65+"]
+
+# Directory holding user-editable observed-case CSVs (one dataset per file).
+OBSERVED_DIR = os.path.join(os.path.dirname(__file__), "observed")
 
 # --- Raw source table: age_label -> {"No":, "Unknown":, "Yes":} ------------------
 LANE_COUNTY_RAW = {
@@ -99,11 +106,96 @@ def summary(raw: dict = LANE_COUNTY_RAW) -> dict:
     }
 
 
-# Registry of available observed datasets (name -> metadata + accessors)
-OBSERVED_DATASETS = {
-    "Lane County, Oregon — pertussis cases": {
-        "geography_hint": "United_States__Oregon__Lane_County",
-        "raw": LANE_COUNTY_RAW,
-        "note": "Cumulative confirmed pertussis cases by age and vaccination-up-to-date status.",
-    },
-}
+# ----------------------------------------------------------------------------
+# CSV loader — observed datasets maintained outside the source
+# ----------------------------------------------------------------------------
+# A dataset CSV has an optional metadata header (comment lines beginning with
+# "#", as "# key: value") followed by a data table:
+#
+#     # name: Lane County, Oregon — pertussis cases
+#     # geography_hint: United_States__Oregon__Lane_County
+#     # note: Cumulative confirmed pertussis cases ...
+#     age_label,No,Unknown,Yes
+#     1,16,0,13
+#     22-24,3,2,7
+#     50+,9,1,8
+#
+# age_label follows the same convention as LANE_COUNTY_RAW (single years, "lo-hi"
+# bands, or "50+"); it is folded into the model's 5 bands by _age_label_to_band.
+def load_raw_from_csv(path: str):
+    """Parse one observed-case CSV. Returns (meta_dict, raw_dict) where raw_dict
+    maps age_label -> {"No":, "Unknown":, "Yes":}. Missing count columns default
+    to 0; rows with a blank age_label are skipped."""
+    meta: dict = {}
+    data_lines: list = []
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        for line in f:
+            s = line.strip()
+            if not s:
+                continue
+            if s.startswith("#"):
+                body = s[1:].strip()
+                if ":" in body:
+                    k, v = body.split(":", 1)
+                    meta[k.strip().lower()] = v.strip()
+                continue
+            data_lines.append(line)
+
+    raw: dict = {}
+    reader = csv.DictReader(data_lines)  # first non-comment line is the header
+
+    def _to_int(x):
+        try:
+            return int(float(x))
+        except (TypeError, ValueError):
+            return 0
+
+    for row in reader:
+        label = (row.get("age_label") or "").strip()
+        if not label:
+            continue
+        raw[label] = {
+            "No": _to_int(row.get("No")),
+            "Unknown": _to_int(row.get("Unknown")),
+            "Yes": _to_int(row.get("Yes")),
+        }
+    return meta, raw
+
+
+def _discover_csv_datasets() -> dict:
+    """Build the observed-dataset registry from every CSV in OBSERVED_DIR."""
+    out: dict = {}
+    if not os.path.isdir(OBSERVED_DIR):
+        return out
+    for path in sorted(glob.glob(os.path.join(OBSERVED_DIR, "*.csv"))):
+        try:
+            meta, raw = load_raw_from_csv(path)
+        except Exception:
+            continue  # skip malformed files rather than crash the app
+        if not raw:
+            continue
+        name = meta.get("name") or os.path.splitext(os.path.basename(path))[0]
+        out[name] = {
+            "geography_hint": meta.get("geography_hint"),
+            "raw": raw,
+            "note": meta.get("note", ""),
+            "source": meta.get("source", ""),
+            "source_path": path,
+        }
+    return out
+
+
+# Registry of available observed datasets (name -> metadata + accessors).
+# Loaded from data/observed/*.csv; falls back to the built-in Lane County table
+# so the app still works if the directory is missing or empty.
+OBSERVED_DATASETS = _discover_csv_datasets()
+if not OBSERVED_DATASETS:
+    OBSERVED_DATASETS = {
+        "Lane County, Oregon — pertussis cases": {
+            "geography_hint": "United_States__Oregon__Lane_County",
+            "raw": LANE_COUNTY_RAW,
+            "note": "Cumulative confirmed pertussis cases by age and vaccination-up-to-date status.",
+            "source": "Lane County pertussis case line-list, provided by the SOAR/IRS team.",
+            "source_path": None,
+        },
+    }
