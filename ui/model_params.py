@@ -23,6 +23,7 @@ def render_model_params(model: str, model_param_schemas: dict) -> None:
                     value=float(current),
                     step=float(p["step"]),
                     key=widget_key,
+                    help=p.get("help"),
                 )
                 st.session_state["model_params"][model][k] = val
 
@@ -48,11 +49,11 @@ def render_model_params(model: str, model_param_schemas: dict) -> None:
                         st.session_state["model_params"][model][f"{k}_{i}"] = age_val
 
             elif p["type"] == "discrete":
-                val = st.selectbox(p["label"], options=p["options"], index=p["options"].index(current), key=widget_key)
+                val = st.selectbox(p["label"], options=p["options"], index=p["options"].index(current), key=widget_key, help=p.get("help"))
                 st.session_state["model_params"][model][k] = val
-            
+
             else:
-                val = st.text_input(p["label"], value=str(current), key=widget_key)
+                val = st.text_input(p["label"], value=str(current), key=widget_key, help=p.get("help"))
                 st.session_state["model_params"][model][k] = val
 
             

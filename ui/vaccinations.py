@@ -114,26 +114,46 @@ def render_vaccination_campaigns(model: str, age_groups: list[str] | None = None
 
         r1 = st.columns([1.2, 0.9, 0.9], gap="small")
         with r1[0]:
-            st.text_input("Name", key="_vx_new_name")
+            st.text_input("Name", key="_vx_new_name",
+                help="A label for this campaign (e.g. 'DTaP primary series' or 'Adolescent Tdap').")
         with r1[1]:
-            st.number_input("Start day", min_value=0, max_value=10_000, step=1, key="_vx_new_start")
+            st.number_input("Start day", min_value=0, max_value=10_000, step=1, key="_vx_new_start",
+                help=("Simulation day dosing begins (day 0 = the run's start date). How to derive: "
+                      "the campaign's real start date relative to your model start date."))
         with r1[2]:
-            st.number_input("End day", min_value=0, max_value=10_000, step=1, key="_vx_new_end")
+            st.number_input("End day", min_value=0, max_value=10_000, step=1, key="_vx_new_end",
+                help=("Simulation day dosing ends. For an ongoing/routine program, set this to the "
+                      "full run length. Doses are spread across this window."))
 
         r2 = st.columns([1.1, 1.1], gap="small")
         with r2[0]:
-            st.slider("Target coverage (%)", 0, 100, step=1, key="_vx_new_cov_pct")
+            st.slider("Target coverage (%)", 0, 100, step=1, key="_vx_new_cov_pct",
+                help=("Fraction of each selected age band vaccinated over the window (coverage × "
+                      "efficacy = the effective S→Sₚ doses). How to derive: program coverage targets "
+                      "or historical uptake for that age group; for decennial adult boosters over a "
+                      "single season, ≈ 10%/year of run. Tactical: (doses given in the age band ÷ that "
+                      "band's population) × 100, from your IIS."))
         with r2[1]:
-            st.slider("Vaccine efficacy (%)", 0, 100, step=1, key="_vx_new_ve_pct")
+            st.slider("Vaccine efficacy (%)", 0, 100, step=1, key="_vx_new_ve_pct",
+                help=("Vaccine effectiveness against susceptibility — the fraction of doses that "
+                      "actually confer protection. How to derive: vaccine-effectiveness studies "
+                      "(acellular pertussis primary series ≈ 80–85%; adult booster somewhat lower). "
+                      "Tactical: screening-method VE = 1 − [PCV/(1−PCV)]·[(1−PPV)/PPV], where PCV = % of "
+                      "cases vaccinated (line list) and PPV = population coverage (IIS)."))
 
         r3 = st.columns([1.4, 0.8, 0.8], gap="small")
         with r3[0]:
-            st.multiselect("Target age groups", options=age_groups, key="_vx_new_age_groups")
+            st.multiselect("Target age groups", options=age_groups, key="_vx_new_age_groups",
+                help=("Age bands that receive this campaign. Map the schedule to bands — e.g. DTaP "
+                      "primary series → 0-4; adolescent Tdap → 5-19; decennial boosters → adults."))
         with r3[1]:
-            st.selectbox("Rollout", options=ROLLOUT_SHAPES, key="_vx_new_rollout")
+            st.selectbox("Rollout", options=ROLLOUT_SHAPES, key="_vx_new_rollout",
+                help=("Dose timing across the window: 'flat' = even daily rate; 'ramp' = linear "
+                      "ramp-up. Choose to match how quickly the program reached full delivery."))
         with r3[2]:
             # Only meaningful for ramp, but we can keep it visible; validation will handle.
-            st.number_input("Ramp-up days", min_value=1, max_value=10_000, step=1, key="_vx_new_ramp_days")
+            st.number_input("Ramp-up days", min_value=1, max_value=10_000, step=1, key="_vx_new_ramp_days",
+                help="For 'ramp' rollout only: number of days to reach the full daily dosing rate.")
 
         add = st.button("Add campaign", type="primary", use_container_width=True)
 
