@@ -10,6 +10,9 @@ from helpers import contact_matrix_df
 from schemas import MODEL_COMPS
 from constants import DEFAULT_AGE_GROUPS
 from collections import OrderedDict
+from engine.hospitalization import (
+    HOSP_AGE_GROUPS, HOSP_DEFAULTS, hospitalizations_from_trans, hospitalization_summary,
+)
 
 ages_to_idx = {ag: i for i, ag in enumerate(DEFAULT_AGE_GROUPS)}
 
@@ -663,6 +666,125 @@ def render_metrics_tab(primary_id, selected_ids, scenarios, results):
     )
 
 
+def _hosp_params_editor():
+    """Editable hospitalization-model parameters (persisted in session_state)."""
+    st.session_state.setdefault("hosp_params", dict(HOSP_DEFAULTS))
+    p = st.session_state["hosp_params"]
+    with st.expander("Hospitalization model parameters", expanded=False):
+        st.caption(
+            "Hospitalizations = incidence × per-case hospitalization ratio (IHR), by "
+            "age and vaccination status. Naive (unvaccinated) IHR per output band; "
+            "partial (vaccinated) cases use partial ratio × the naive IHR. Defaults "
+            "reflect published pertussis patterns (CDC) — calibrate locally."
+        )
+        c = st.columns(3)
+        p["ihr_infant"] = c[0].number_input("IHR <1 yr", 0.0, 1.0, float(p["ihr_infant"]), 0.01,
+                                            help="Per-case hospitalization prob. for infants <1 yr (naive). CDC: ~1/3.")
+        p["ihr_toddler"] = c[1].number_input("IHR 1-4", 0.0, 1.0, float(p["ihr_toddler"]), 0.01)
+        p["ihr_5_19"] = c[2].number_input("IHR 5-19", 0.0, 1.0, float(p["ihr_5_19"]), 0.005, format="%.3f")
+        c = st.columns(3)
+        p["ihr_20_49"] = c[0].number_input("IHR 20-49", 0.0, 1.0, float(p["ihr_20_49"]), 0.005, format="%.3f")
+        p["ihr_50_64"] = c[1].number_input("IHR 50-64", 0.0, 1.0, float(p["ihr_50_64"]), 0.005, format="%.3f")
+        p["ihr_65p"] = c[2].number_input("IHR 65+", 0.0, 1.0, float(p["ihr_65p"]), 0.005, format="%.3f")
+        c = st.columns(3)
+        p["partial_ratio"] = c[0].number_input("Partial ratio", 0.0, 1.0, float(p["partial_ratio"]), 0.05,
+                                               help="Vaccinated/partial IHR as a fraction of the naive IHR (milder disease).")
+        p["infant_fraction"] = c[1].number_input("Infant share of 0-4", 0.0, 1.0, float(p["infant_fraction"]), 0.05,
+                                                 help="Fraction of 0-4 incidence attributed to infants <1 (for the <1 vs 1-4 split).")
+        p["delay_days"] = c[2].number_input("Onset→hosp delay (days)", 0, 60, int(p["delay_days"]), 1,
+                                            help="Lag applied to the hospitalization curve. Pertussis ~1-2 weeks.")
+    return p
+
+
+def render_hospitalizations_tab(primary_id, selected_ids, scenarios, results):
+    """Hospitalization observation model: incidence × age/status-specific IHR,
+    with 0-4 resolved into <1 and 1-4. A lens on output; does not change dynamics."""
+    model = scenarios[primary_id]["config"]["model"]
+    st.caption(
+        "Modeled hospitalizations derived from infection incidence (E→I, and Eₚ→Iₚ "
+        "for pertussis) via age- and vaccination-status-specific hospitalization "
+        "ratios. The 0–4 band is split into **<1** and **1–4** so the infant burden "
+        "is visible. This is an observation layer — it does not alter transmission."
+    )
+    params = _hosp_params_editor()
+
+    view = st.radio("View", ["Weekly", "Cumulative"], horizontal=True, key="_hosp_view")
+
+    # Build a per-scenario, per-age hospitalization frame.
+    frames = []
+    for sid in selected_ids:
+        daily = hospitalizations_from_trans(results[sid]["transitions"], params, model)
+        daily["week"] = (daily["t"] - 1) // 7
+        if view == "Weekly":
+            agg = daily.groupby(["week", "age_group"], as_index=False)["hosp"].sum()
+            agg = agg.rename(columns={"week": "x"})
+        else:
+            daily = daily.sort_values("t")
+            daily["hosp"] = daily.groupby("age_group")["hosp"].cumsum()
+            agg = daily.rename(columns={"t": "x"})[["x", "age_group", "hosp"]]
+        agg["scenario"] = scenarios[sid].get("name", sid)
+        frames.append(agg)
+    plot_df = pd.concat(frames, ignore_index=True)
+
+    x_title = "Week" if view == "Weekly" else "Day"
+    y_title = "Hospitalizations (weekly)" if view == "Weekly" else "Cumulative hospitalizations"
+
+    # For a single scenario colour by age band; for several, colour by scenario + facet age.
+    if len(selected_ids) == 1:
+        chart = (
+            alt.Chart(plot_df)
+            .mark_line()
+            .encode(
+                x=alt.X("x:Q", title=x_title),
+                y=alt.Y("hosp:Q", title=y_title),
+                color=alt.Color("age_group:N", title="Age band",
+                                sort=HOSP_AGE_GROUPS, scale=alt.Scale(scheme="tableau10")),
+                tooltip=["age_group:N", alt.Tooltip("x:Q", title=x_title),
+                         alt.Tooltip("hosp:Q", title="Hospitalizations", format=".1f")],
+            )
+            .interactive()
+        )
+    else:
+        chart = (
+            alt.Chart(plot_df)
+            .mark_line()
+            .encode(
+                x=alt.X("x:Q", title=x_title),
+                y=alt.Y("hosp:Q", title=y_title),
+                color=alt.Color("scenario:N", title="Scenario", scale=alt.Scale(scheme="set2")),
+                facet=alt.Facet("age_group:N", columns=3, sort=HOSP_AGE_GROUPS, title=None),
+                tooltip=["scenario:N", "age_group:N", alt.Tooltip("hosp:Q", format=".1f")],
+            )
+            .properties(width=200, height=140)
+        )
+    st.altair_chart(chart, use_container_width=True)
+
+    # Totals table (primary scenario) + metric + download.
+    summ = hospitalization_summary(results[primary_id]["transitions"], params, model)
+    total = float(summ.loc[summ["age_group"] == "total", "hosp"].iloc[0])
+    infants = float(summ.loc[summ["age_group"] == "<1", "hosp"].iloc[0])
+    m1, m2 = st.columns(2)
+    m1.metric("Total modeled hospitalizations", f"{total:,.0f}")
+    m2.metric("Infant (<1) share", f"{(infants / total):.0%}" if total > 0 else "—",
+              help="Share of modeled hospitalizations in infants <1 yr.")
+
+    show = summ.copy()
+    show["hosp"] = show["hosp"].round(1)
+    show = show.rename(columns={"age_group": "Age band", "hosp": "Hospitalizations"})
+    st.dataframe(show, hide_index=True, use_container_width=True)
+    st.download_button(
+        "Download hospitalizations (CSV)",
+        data=plot_df.to_csv(index=False).encode("utf-8"),
+        file_name=f"hospitalizations_{view.lower()}_{model}.csv",
+        mime="text/csv",
+    )
+    st.caption(
+        "Note: infant hospitalization dominates but the 0–4 transmission band is coarse; "
+        "the <1 vs 1–4 split here uses the 'Infant share of 0-4' parameter, not a separate "
+        "infant contact structure. Treat the <1 series as an IHR-scaled view of 0–4 incidence."
+    )
+
+
 def render_observed_comparison(primary_id, scenarios, results):
     """Compare the primary run against the selected observed case dataset."""
     from data.observed_datasets import OBSERVED_DATASETS
@@ -940,11 +1062,16 @@ def render_viz_panel(model: str, geography: str) -> None:
     selected_ids = [primary_id] + compare_ids
 
     has_observed = bool(scenarios[primary_id]["config"].get("observed_dataset"))
-    tab_labels = ["Trajectories", "Summary metrics", "Contact Interventions", "Vaccinations", "Population"]
+    tab_labels = ["Trajectories", "Summary metrics", "Hospitalizations",
+                  "Contact Interventions", "Vaccinations", "Population"]
     if has_observed:
         tab_labels.append("Observed vs modeled")
     _tabs = st.tabs(tab_labels)
-    tab_ts, tab_metrics, tab_contact_interventions, tab_vaccinations, tab_population = _tabs[:5]
+    (tab_ts, tab_metrics, tab_hosp, tab_contact_interventions,
+     tab_vaccinations, tab_population) = _tabs[:6]
+
+    with tab_hosp:
+        render_hospitalizations_tab(primary_id, selected_ids, scenarios, results)
 
     with tab_ts:
         render_compartment_timeseries(MODEL_COMPS[model], selected_ids, scenarios, results)
@@ -1003,5 +1130,5 @@ def render_viz_panel(model: str, geography: str) -> None:
         )
 
     if has_observed:
-        with _tabs[5]:
+        with _tabs[6]:
             render_observed_comparison(primary_id, scenarios, results)
