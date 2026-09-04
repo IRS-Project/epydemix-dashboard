@@ -226,18 +226,32 @@ def _normalize_peak(a) -> np.ndarray:
     return a / m if m > 0 else a
 
 
-def curve_shape_distance(obs_weekly, df_trans, model: str) -> float:
+def curve_shape_distance(obs_weekly, df_trans, model: str, mode: str = "weekly") -> float:
     """Scale-free distance between an observed weekly case series and the modeled
-    weekly incidence *shape*. Both are peak-normalised over their overlapping
-    window; the score is RMSE plus a peak-week-timing penalty. This is what a
-    time series adds over a cross-tab: it constrains growth rate, peak timing and
-    seasonality (hence R₀), which shares/age-distributions cannot."""
+    incidence *shape*, over their overlapping window. This is what a time series
+    adds over a cross-tab: it constrains growth rate, peak timing and seasonality
+    (hence R₀), which shares/age-distributions cannot.
+
+    mode="weekly": peak-normalise the weekly curves; score = RMSE + peak-week
+        timing penalty (rewards matching the epidemic peak).
+    mode="cumulative": cumulate then normalise each curve to its final total
+        (a 0→1 S-curve); score = RMSE of the normalised cumulatives (rewards
+        matching *when* incidence accrues; smoother/less noise-sensitive, no peak
+        penalty since a cumulative's maximum is always its last point)."""
     obs = np.clip(np.asarray(obs_weekly, dtype=float), 0.0, None)
     mod = weekly_incidence_from_trans(df_trans, model)
     if obs.size == 0 or mod.size == 0 or obs.max() <= 0 or mod.max() <= 0:
         return 1.0
     L = min(len(obs), len(mod))
-    o, m = _normalize_peak(obs[:L]), _normalize_peak(mod[:L])
+    o, m = obs[:L], mod[:L]
+
+    if mode == "cumulative":
+        oc, mc = np.cumsum(o), np.cumsum(m)
+        on = oc / oc[-1] if oc[-1] > 0 else oc
+        mn = mc / mc[-1] if mc[-1] > 0 else mc
+        return float(np.sqrt(np.mean((on - mn) ** 2)))
+
+    o, m = _normalize_peak(o), _normalize_peak(m)
     rmse = float(np.sqrt(np.mean((o - m) ** 2)))
     peak_pen = abs(int(np.argmax(o)) - int(np.argmax(m))) / max(1, L - 1)
     return rmse + 0.5 * peak_pen
@@ -313,6 +327,7 @@ def abc_smc_calibrate(base_scenario, raw, run_fn, *, n_particles=40, n_rounds=3,
     # seasonality information the cross-tab lacks).
     weekly = base_scenario.get("weekly_target") or None
     weekly_weight = float(base_scenario.get("weekly_weight", 1.0))
+    weekly_mode = base_scenario.get("weekly_mode", "weekly")
     model_name = base_scenario.get("model")
 
     def report(frac, msg):
@@ -327,7 +342,7 @@ def abc_smc_calibrate(base_scenario, raw, run_fn, *, n_particles=40, n_rounds=3,
             _comp, trans, *_ = run_fn(_apply_abc_params(base_scenario, x))
             d = fit_error(obs, modeled_case_summary(trans))["score"]
             if weekly:
-                d += weekly_weight * curve_shape_distance(weekly, trans, model_name)
+                d += weekly_weight * curve_shape_distance(weekly, trans, model_name, mode=weekly_mode)
             return float(d) if np.isfinite(d) else 1e6
         except Exception:
             return 1e6

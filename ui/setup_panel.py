@@ -216,16 +216,32 @@ def render_observed_panel(model: str, geography: str) -> None:
         import altair as alt
         wdf = st.session_state["_weekly_df"].copy()
         wdf["idx"] = range(len(wdf))
+        wdf["cumulative"] = wdf["cases"].cumsum()
         st.caption(f"{wmeta['area']} · {len(wdf)} weeks · {wmeta['source']}")
+
+        basis_label = st.radio(
+            "Curve basis (chart & calibration fit)",
+            options=["Cumulative totals", "Weekly totals"],
+            index=0,
+            horizontal=True,
+            key="_weekly_basis",
+            help="Cumulative: running total (a 0→1 S-curve when fitted). Weekly: "
+                 "per-week new cases. This choice drives both the chart below and "
+                 "the curve term used in ABC-SMC calibration.",
+        )
+        _cumulative = basis_label.startswith("Cumulative")
+        y_col = "cumulative" if _cumulative else "cases"
+        y_title = "Cumulative cases" if _cumulative else "Weekly cases"
         ch = (
             alt.Chart(wdf)
             .mark_line(color="#4c9be8")
             .encode(
                 x=alt.X("idx:Q", title="Week index"),
-                y=alt.Y("cases:Q", title="Weekly cases"),
+                y=alt.Y(f"{y_col}:Q", title=y_title),
                 tooltip=[alt.Tooltip("year:Q", title="Year"),
                          alt.Tooltip("week:Q", title="MMWR week"),
-                         alt.Tooltip("cases:Q", title="Cases")],
+                         alt.Tooltip("cases:Q", title="Weekly"),
+                         alt.Tooltip("cumulative:Q", title="Cumulative")],
             )
         )
         st.altair_chart(ch, use_container_width=True)
@@ -235,11 +251,14 @@ def render_observed_panel(model: str, geography: str) -> None:
                          "timing) to the ABC-SMC distance, alongside the age-distribution "
                          "and vaccinated-share terms.")
         st.slider("Weekly-fit weight", 0.0, 3.0, 1.0, 0.5, key="_weekly_weight",
-                  help="Relative weight of the weekly-curve term vs the cross-tab terms.")
+                  help="Relative weight of the curve term vs the cross-tab terms.")
+        _basis_txt = ("cumulative totals (normalised to the final total)" if _cumulative
+                      else "weekly totals (peak-normalised)")
         st.caption(
-            "The curve is matched by *shape* over the overlapping window from the "
-            "simulation start, so choose a year window covering one outbreak season. "
-            "Absolute magnitude is ignored (state counts vs a county-scaled model)."
+            f"Calibration fits the **{_basis_txt}** by *shape* over the overlapping "
+            "window from the simulation start, so choose a year window covering one "
+            "outbreak season. Absolute magnitude is ignored (state counts vs a "
+            "county-scaled model)."
         )
 
     # ---- Bayesian calibration (ABC-SMC) -------------------------------------
@@ -251,7 +270,9 @@ def render_observed_panel(model: str, geography: str) -> None:
     )
     if st.session_state.get("_weekly_fit_on") and st.session_state.get("_weekly_meta"):
         _wm = st.session_state["_weekly_meta"]
-        st.info(f"Weekly curve **active**: {_wm['area']} "
+        _basis = ("cumulative" if str(st.session_state.get("_weekly_basis", "")).startswith("Cumulative")
+                  else "weekly")
+        st.info(f"Curve fit **active** ({_basis} totals): {_wm['area']} "
                 f"({', '.join(str(y) for y in _wm['years']) or 'all years'}) — "
                 f"weight {st.session_state.get('_weekly_weight', 1.0):g}. This sharply "
                 "tightens the R₀ posterior.")
@@ -279,6 +300,9 @@ def render_observed_panel(model: str, geography: str) -> None:
         if st.session_state.get("_weekly_fit_on") and st.session_state.get("_weekly_meta"):
             base["weekly_target"] = st.session_state["_weekly_meta"]["series"]
             base["weekly_weight"] = float(st.session_state.get("_weekly_weight", 1.0))
+            base["weekly_mode"] = ("cumulative"
+                                   if str(st.session_state.get("_weekly_basis", "")).startswith("Cumulative")
+                                   else "weekly")
         old_nsim = _runmod.N_SIM
         _runmod.N_SIM = 3  # reduced replicates during the search
         try:
