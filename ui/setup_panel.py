@@ -398,16 +398,29 @@ def _on_model_change():
     reset_initial_conditions_to_defaults(m, INITIAL_CONDITION_DEFAULTS)
 
 
+def _us_only(locations):
+    """Restrict the geography list to United States entries (national, state and
+    county). All U.S. locations in epydemix-data are prefixed 'United_States',
+    which excludes 'United_Kingdom' / 'United_Arab_Emirates'. Falls back to the
+    full list if no U.S. entries are present."""
+    us = [loc for loc in locations if str(loc).startswith("United_States")]
+    return us or list(locations)
+
+
 def render_setup_panel(load_locations_fn, model_param_schemas):
     st.subheader("Setup")
 
     # Initialize workspace early if scenarios/results exist but workspace doesn't
     scenarios_exist = bool(st.session_state.get("scenarios"))
     results_exist = bool(st.session_state.get("results"))
-    
+
+    # Geography menu is restricted to the United States (this is a US-focused
+    # pertussis tool). Loaded once and reused for the default and the selectbox.
+    locations = _us_only(load_locations_fn())
+
     # Get current selections early (before any UI elements)
     st.session_state.setdefault("selected_model", "SEIR (Measles)")
-    st.session_state.setdefault("selected_geography", load_locations_fn()[0])
+    st.session_state.setdefault("selected_geography", locations[0])
     
     # Initialize workspace if needed BEFORE checking workspace_active
     if st.session_state.get("workspace") is None and (scenarios_exist or results_exist):
@@ -447,8 +460,6 @@ def render_setup_panel(load_locations_fn, model_param_schemas):
         )
     
     with c2:
-        # load locations
-        locations = load_locations_fn()
         geography = st.selectbox(
             "Geography",
             options=locations,
