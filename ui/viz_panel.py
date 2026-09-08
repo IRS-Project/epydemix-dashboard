@@ -378,28 +378,33 @@ def render_compartment_timeseries(compartments, selected_ids, scenarios, results
 
     series_col_label = series_col.replace("_", " (") + ")"
 
-    # ---- Posterior-predictive (parameter-uncertainty) band from an ABC-SMC run.
-    # Global (single calibrated model), drawn once in a distinct dashed orange style.
+    # ---- Posterior-predictive (parameter-uncertainty) from an ABC-SMC run.
+    # Distinct orange style; can be shown as a band, individual per-draw traces, or both.
     pp = st.session_state.get("_abc_ppc")
-    pp_layers = []
+    pp_area = pp_med = pp_traces = None
     pp_caption = ""
     if pp is not None and isinstance(pp.get("compartments_pp"), pd.DataFrame):
         cpp = pp["compartments_pp"]
-        pcols = st.columns([0.45, 0.55])
+        draws = pp.get("compartments_draws")
+        has_draws = isinstance(draws, pd.DataFrame) and series_col in getattr(draws, "columns", [])
+        modes = ["Off", "Band"] + (["Individual traces", "Band + traces"] if has_draws else [])
+        pcols = st.columns([0.6, 0.4])
         with pcols[0]:
-            pp_on = st.checkbox(
-                "Overlay ABC posterior-predictive band", value=True,
-                help="Parameter-uncertainty band built from the ABC-SMC posterior "
-                     "(parameter sets resampled from the posterior, each simulated). "
-                     "Distinct from the stochastic band above, which fixes the "
-                     "parameters and varies only the random seed.",
+            pp_mode = st.radio(
+                "ABC posterior-predictive", modes, index=1, horizontal=True, key="_pp_mode",
+                help="Parameter-uncertainty from the ABC-SMC posterior (parameter sets "
+                     "resampled and each simulated). Band = shaded percentile band + median; "
+                     "Individual traces = one line per posterior draw (spaghetti); Both = overlay.",
             )
         with pcols[1]:
             pp_level = st.radio(
                 "Posterior band level", ["50%", "90%", "95%"], index=2,
                 horizontal=True, key="_pp_band_level", label_visibility="collapsed",
             )
-        if pp_on and series_col in cpp.columns and "quantile" in cpp.columns:
+        want_band = pp_mode in ("Band", "Band + traces")
+        want_traces = pp_mode in ("Individual traces", "Band + traces")
+
+        if want_band and series_col in cpp.columns and "quantile" in cpp.columns:
             qlo, qhi = _BANDS[pp_level]
             plo = cpp[np.isclose(cpp["quantile"], qlo)][["t", series_col]].rename(columns={series_col: "lo"})
             phi = cpp[np.isclose(cpp["quantile"], qhi)][["t", series_col]].rename(columns={series_col: "hi"})
@@ -422,8 +427,22 @@ def render_compartment_timeseries(compartments, selected_ids, scenarios, results
                 .encode(x="t:Q", y="med:Q",
                         tooltip=[alt.Tooltip("med:Q", title="Posterior median")])
             )
-            pp_layers = [pp_area, pp_med]
-            pp_caption = f"  ·  dashed orange = posterior-predictive {pp_level} band ({pp['n_draws']} draws)"
+            pp_caption += f"  ·  dashed orange = posterior {pp_level} band"
+
+        if want_traces and has_draws:
+            dtr = draws[["t", "draw", series_col]].rename(columns={series_col: "value"})
+            pp_traces = (
+                alt.Chart(dtr)
+                .mark_line(color="#e8833a", opacity=0.16, strokeWidth=1)
+                .encode(
+                    x=alt.X("t:Q", title="Day"),
+                    y=alt.Y("value:Q", title=series_col_label),
+                    detail="draw:N",
+                    tooltip=[alt.Tooltip("draw:N", title="Draw"), "t:Q",
+                             alt.Tooltip("value:Q", title="Value")],
+                )
+            )
+            pp_caption += f"  ·  {pp['n_draws']} posterior traces"
 
     st.caption(f"Showing: {series_col_label} (median line)"
                + (f"  ·  shaded = {band_choice} band" if band_rows else "")
@@ -441,9 +460,11 @@ def render_compartment_timeseries(compartments, selected_ids, scenarios, results
     )
 
     layers = []
-    # Posterior-predictive band underneath (parameter uncertainty)
-    if pp_layers:
-        layers.append(pp_layers[0])
+    # Posterior-predictive underneath (parameter uncertainty): band, then traces
+    if pp_area is not None:
+        layers.append(pp_area)
+    if pp_traces is not None:
+        layers.append(pp_traces)
     if band_rows:
         band_df = pd.concat(band_rows, ignore_index=True)
         area = (
@@ -460,8 +481,8 @@ def render_compartment_timeseries(compartments, selected_ids, scenarios, results
         layers.append(area)
     layers.append(line)
     # Posterior-predictive median (dashed) on top
-    if len(pp_layers) > 1:
-        layers.append(pp_layers[1])
+    if pp_med is not None:
+        layers.append(pp_med)
 
     chart = alt.layer(*layers).interactive()
     st.altair_chart(chart, use_container_width=True)

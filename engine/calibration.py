@@ -495,9 +495,17 @@ def posterior_predictive(base_scenario, abc_result, run_fn, *, n_draws=30,
         out_rows.append(pd.DataFrame(row))
     pp_df = pd.concat(out_rows, ignore_index=True)
 
+    # Retain each draw's individual trajectory (long form: t, draw, <series...>)
+    # so the viz can show the individual posterior traces, not just the band.
+    draws_long = pd.concat(
+        [frames[i].iloc[:L].assign(draw=i) for i in range(len(frames))],
+        ignore_index=True,
+    )
+
     report(1.0, "Done")
     return {
         "compartments_pp": pp_df,
+        "compartments_draws": draws_long,
         "n_draws": len(frames),
         "params": abc_result.get("params", [p[0] for p in ABC_PARAMS]),
     }
