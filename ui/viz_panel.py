@@ -784,53 +784,6 @@ def render_hospitalizations_tab(primary_id, selected_ids, scenarios, results):
         "infant contact structure. Treat the <1 series as an IHR-scaled view of 0–4 incidence."
     )
 
-    # ---- Observed hospitalizations as a calibration target ------------------
-    st.divider()
-    st.markdown("**Calibrate to observed hospitalizations**")
-    st.caption(
-        "Optional. Supply a **local** weekly pertussis *hospitalization* count series "
-        "(CSV) to add a hospitalization curve-shape term to ABC-SMC. There is no public "
-        "weekly pertussis hospitalization feed (CDC NNDSS reports cases), so this must "
-        "come from your own line-list/records. Hospitalizations are a cleaner, less "
-        "reporting-biased signal than case counts. CSV: a single column of weekly counts, "
-        "or a column named 'hosp' (optionally with 'week')."
-    )
-    up = st.file_uploader("Observed weekly hospitalizations (CSV)", type=["csv"],
-                          key="_hosp_upload")
-    if up is not None:
-        try:
-            hdf = pd.read_csv(up)
-            if "hosp" in hdf.columns:
-                series = hdf["hosp"].astype(float).tolist()
-            else:
-                num = hdf.select_dtypes("number")
-                series = num.iloc[:, -1].astype(float).tolist() if not num.empty else []
-            series = [float(x) for x in series if pd.notna(x)]
-            if series:
-                st.session_state["_hosp_meta"] = {"series": series, "n": len(series),
-                                                  "name": getattr(up, "name", "uploaded.csv")}
-            else:
-                st.warning("No numeric hospitalization values found in that CSV.")
-        except Exception as exc:
-            st.error(f"Could not parse CSV: {exc}")
-
-    hmeta = st.session_state.get("_hosp_meta")
-    if hmeta:
-        st.caption(f"Loaded {hmeta['n']} weeks from {hmeta['name']} "
-                   f"(peak {max(hmeta['series']):.0f}, total {sum(hmeta['series']):.0f}).")
-        cc = st.columns([0.5, 0.5])
-        with cc[0]:
-            st.checkbox("Use in ABC-SMC calibration", value=True, key="_hosp_fit_on",
-                        help="Adds a hospitalization curve-shape term to the ABC-SMC distance.")
-        with cc[1]:
-            st.radio("Hosp. basis", ["Cumulative totals", "Weekly totals"], index=0,
-                     horizontal=True, key="_hosp_basis", label_visibility="collapsed")
-        st.slider("Hospitalization-fit weight", 0.0, 3.0, 1.0, 0.5, key="_hosp_weight",
-                  help="Relative weight of the hospitalization curve term in ABC-SMC.")
-        st.caption("Fit uses the current hospitalization-model IHRs above and the ABC-SMC "
-                   "controls in the Observed data & calibration panel. Modeled hospitalizations "
-                   "are matched by shape (magnitude ignored).")
-
 
 def render_observed_comparison(primary_id, scenarios, results):
     """Compare the primary run against the selected observed case dataset."""
