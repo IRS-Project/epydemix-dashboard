@@ -316,8 +316,13 @@ def abc_smc_calibrate(base_scenario, raw, run_fn, *, n_particles=40, n_rounds=3,
 
     Returns a dict with per-parameter posterior summary (median + 95% credible
     interval), the raw particles/weights, and the observed target shares.
+
+    `raw` may be None for a curve-only calibration (e.g. validating R0 against a
+    large state's weekly NNDSS series without a matching age/vaccination cross-tab);
+    in that case the age-distribution and vaccinated-share terms are skipped and a
+    weekly and/or hospitalization target must be supplied.
     """
-    obs = observed_targets(raw)
+    obs = observed_targets(raw) if raw is not None else None
     lo = np.array([p[2] for p in ABC_PARAMS], dtype=float)
     hi = np.array([p[3] for p in ABC_PARAMS], dtype=float)
     D = len(ABC_PARAMS)
@@ -340,7 +345,9 @@ def abc_smc_calibrate(base_scenario, raw, run_fn, *, n_particles=40, n_rounds=3,
     def distance(x):
         try:
             _comp, trans, *_ = run_fn(_apply_abc_params(base_scenario, x))
-            d = fit_error(obs, modeled_case_summary(trans))["score"]
+            d = 0.0
+            if obs is not None:
+                d += fit_error(obs, modeled_case_summary(trans))["score"]
             if weekly:
                 d += weekly_weight * curve_shape_distance(weekly, trans, model_name, mode=weekly_mode)
             return float(d) if np.isfinite(d) else 1e6
@@ -425,7 +432,7 @@ def abc_smc_calibrate(base_scenario, raw, run_fn, *, n_particles=40, n_rounds=3,
         "final_eps": eps,
         "n_particles": int(len(particles)),
         "rounds_completed": rounds_completed,
-        "observed": {"overall_partial_share": obs["overall_partial_share"]},
+        "observed": {"overall_partial_share": obs["overall_partial_share"] if obs is not None else None},
     }
 
 
