@@ -13,6 +13,63 @@ from data.observed_datasets import OBSERVED_DATASETS, aggregate_to_bands, summar
 from constants import DEFAULT_AGE_GROUPS
 
 
+@st.dialog("Seasonality basis: multi-year NNDSS", width="large")
+def _show_seasonality_dialog(est: dict) -> None:
+    """Modal illustrating why a seasonal peak period was selected: overlay each
+    year's normalised weekly curve, the multi-year average, and the chosen peak."""
+    import altair as alt
+    import pandas as pd
+
+    st.markdown(f"**{est['area']}** · years {', '.join(str(y) for y in est['years'])} · {est['source']}")
+    c = st.columns(4)
+    c[0].metric("Peak week", f"{est['peak_week']}")
+    c[1].metric("Peak day-of-year", f"{est['peak_day']}")
+    c[2].metric("Amplitude", est["amplitude_label"])
+    c[3].metric("Cross-year spread", f"±{est['peak_week_spread']:.0f} wk",
+                help="Std. dev. of each year's own peak week. Large spread ⇒ the seasonal "
+                     "timing is inconsistent across years (epidemic-dominated), so treat the "
+                     "auto peak with caution.")
+
+    per = est["per_year"].copy()
+    per["year"] = per["year"].astype(str)
+    avg = est["avg"]
+    year_lines = (
+        alt.Chart(per).mark_line(opacity=0.45, strokeWidth=1.5)
+        .encode(
+            x=alt.X("week:Q", title="MMWR week of year"),
+            y=alt.Y("norm:Q", title="Weekly cases ÷ that year's mean"),
+            color=alt.Color("year:N", title="Year", scale=alt.Scale(scheme="set2")),
+            tooltip=["year:N", "week:Q", alt.Tooltip("norm:Q", format=".2f")],
+        )
+    )
+    avg_line = (
+        alt.Chart(avg).mark_line(color="#e8833a", strokeWidth=3)
+        .encode(x="week:Q", y=alt.Y("smooth:Q", title="Weekly cases ÷ that year's mean"))
+    )
+    peak_rule = (
+        alt.Chart(pd.DataFrame({"week": [est["peak_week"]]}))
+        .mark_rule(color="#e8833a", strokeDash=[5, 3], strokeWidth=2)
+        .encode(x="week:Q")
+    )
+    st.altair_chart(alt.layer(year_lines, avg_line, peak_rule).interactive(),
+                    use_container_width=True)
+
+    st.caption(
+        "Each thin line is one year's weekly counts normalised by that year's own mean "
+        "(so an epidemic year doesn't dominate the *shape*). The thick orange line is the "
+        "multi-year average cycle; the dashed rule marks its peak week, which sets the "
+        "model's seasonality peak day. Amplitude is the average cycle's robust trough/peak "
+        "(10th/90th percentile) mapped to the nearest category."
+    )
+    if est["peak_week_spread"] >= 8:
+        st.warning(
+            f"Year-to-year peak timing varies by ±{est['peak_week_spread']:.0f} weeks — the "
+            "multi-year signal here is closer to epidemic timing than a stable seasonal cycle. "
+            "Sanity-check against the classic pertussis pattern (late summer / early autumn, "
+            "≈ week 30–40) and override the seasonality peak manually if needed."
+        )
+
+
 @st.dialog("Observed data feeding the calibration", width="large")
 def _show_observed_dialog(choice: str) -> None:
     """Modal popup: the exact observed dataset (raw rows + aggregated bands +
@@ -261,6 +318,60 @@ def render_observed_panel(model: str, geography: str) -> None:
             "county-scaled model)."
         )
 
+    # ---- Seasonality from multi-year NNDSS ----------------------------------
+    st.markdown("**Seasonality (from multi-year NNDSS)**")
+    st.caption(
+        "Pin the seasonal peak timing and amplitude empirically from several years of "
+        "NNDSS weekly cases, rather than free-fitting them (which lets R₀ absorb seasonal "
+        "misfit). Applies to the model's seasonality peak-day and amplitude."
+    )
+    from data.weekly_sources import WEEKLY_AREAS, estimate_seasonality, NATIONAL_LABEL
+
+    sc_ = st.columns([0.55, 0.45])
+    with sc_[0]:
+        _sdef = st.session_state.get("_weekly_area") or (
+            _default_area() if "_default_area" in dir() else WEEKLY_AREAS[0])
+        s_area = st.selectbox("Reporting area (seasonality)", WEEKLY_AREAS,
+                              index=WEEKLY_AREAS.index(_sdef) if _sdef in WEEKLY_AREAS else 0,
+                              key="_season_area")
+    with sc_[1]:
+        s_years = st.multiselect("Years (multi-year)", [2022, 2023, 2024, 2025, 2026],
+                                 default=[2022, 2023, 2024, 2025, 2026], key="_season_years")
+
+    sb = st.columns(2)
+    with sb[0]:
+        if st.button("Estimate & apply seasonality", use_container_width=True):
+            try:
+                with st.spinner(f"Estimating seasonality for {s_area}…"):
+                    est = estimate_seasonality(s_area, years=s_years or None)
+                if not est:
+                    st.warning("No weekly data returned for that selection.")
+                else:
+                    st.session_state["_season_est"] = est
+                    mp_store = st.session_state["model_params"][model]
+                    mp_store["seasonality_peak_day"] = float(est["peak_day"])
+                    mp_store["seasonality_amplitude"] = est["amplitude_label"]
+                    for k in ("seasonality_peak_day", "seasonality_amplitude"):
+                        st.session_state.pop(f"param_{model}_{k}", None)
+                    st.toast(f"Applied: peak day {est['peak_day']} (week {est['peak_week']}), "
+                             f"amplitude {est['amplitude_label']}.")
+                    st.rerun()
+            except Exception as exc:
+                st.error(f"Could not estimate seasonality: {exc}")
+    with sb[1]:
+        if st.button("Why this peak? (view traces)", use_container_width=True,
+                     disabled=not st.session_state.get("_season_est")):
+            _show_seasonality_dialog(st.session_state["_season_est"])
+
+    _se = st.session_state.get("_season_est")
+    if _se:
+        _warn = " ⚠️ inconsistent across years" if _se["peak_week_spread"] >= 8 else ""
+        st.success(
+            f"Applied seasonality from {_se['area']} ({_se['n_years']} yrs): peak day "
+            f"**{_se['peak_day']}** (week {_se['peak_week']}), amplitude **{_se['amplitude_label']}**"
+            f"{_warn}. Adjust in Model parameters if needed."
+        )
+
     # ---- Bayesian calibration (ABC-SMC) -------------------------------------
     st.markdown("**Calibrate (Bayesian · ABC-SMC)**")
     st.caption(
@@ -283,6 +394,17 @@ def render_observed_panel(model: str, geography: str) -> None:
     with ac[1]:
         abc_rounds = st.slider("SMC rounds", 2, 5, 3, 1,
                                help="Refinement rounds with a shrinking tolerance. More = tighter fit, longer runtime.")
+
+    multi_trace = st.checkbox(
+        "Average multiple simulated traces per evaluation", value=True, key="_abc_multi_trace",
+        help="On: evaluate each candidate as an ensemble of stochastic replicates and use the "
+             "median trace, so noise doesn't distort the distance (more robust, slower). "
+             "Off: a single simulated trace per candidate (faster, noisier).",
+    )
+    abc_nsim = 1
+    if multi_trace:
+        abc_nsim = st.slider("Traces per evaluation", 2, 7, 3, 1, key="_abc_nsim",
+                             help="Number of stochastic replicates averaged per candidate during the search.")
     if st.button("Run ABC-SMC calibration", use_container_width=True):
         from state import build_current_config
         from engine.run import run_scenario
@@ -304,7 +426,7 @@ def render_observed_panel(model: str, geography: str) -> None:
                                    if str(st.session_state.get("_weekly_basis", "")).startswith("Cumulative")
                                    else "weekly")
         old_nsim = _runmod.N_SIM
-        _runmod.N_SIM = 3  # reduced replicates during the search
+        _runmod.N_SIM = int(abc_nsim)  # single trace, or an averaged ensemble per candidate
         try:
             abc = abc_smc_calibrate(base, raw, run_scenario,
                                     n_particles=int(abc_particles), n_rounds=int(abc_rounds), progress=_cb)

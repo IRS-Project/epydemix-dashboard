@@ -24,6 +24,7 @@ import re
 import urllib.parse
 import urllib.request
 
+import numpy as np
 import pandas as pd
 
 CDC_HOST = "https://data.cdc.gov"
@@ -139,3 +140,73 @@ def weekly_series_to_array(df: pd.DataFrame):
         return []
     d = df.sort_values(["year", "week"])
     return [float(c) for c in d["cases"].to_numpy()]
+
+
+# Seasonality-amplitude categories -> trough/peak ratio (matches engine SEASONALITY_OPTIONS
+# and the schema options for seasonality_amplitude).
+_AMPLITUDE_CATS = {"Strong": 0.5, "Moderate": 0.65, "Medium": 0.75, "Low": 0.9, "None": 1.0}
+
+
+def estimate_seasonality(area: str, years=None, smooth: int = 5) -> dict | None:
+    """Estimate the seasonal peak timing and amplitude from multi-year weekly
+    NNDSS pertussis data.
+
+    Each year's weekly counts are normalised by that year's mean (so an epidemic
+    year does not dominate the *shape*), then averaged by MMWR week across years
+    to give a typical seasonal cycle. The peak week of the (smoothed) average
+    cycle -> seasonality_peak_day (day-of-year, since START_DATE is Jan 1); the
+    trough/peak ratio -> the nearest seasonality-amplitude category.
+
+    Returns a dict with the estimate and the per-year / average frames for
+    plotting, or None if no data. Pins seasonality empirically rather than
+    letting R0 absorb seasonal misfit during calibration.
+    """
+    df, src = load_weekly_pertussis(area, years=years)
+    if df is None or df.empty:
+        return None
+
+    per_rows = []
+    for y, g in df.groupby("year"):
+        g = g.sort_values("week")
+        m = float(g["cases"].mean())
+        norm = (g["cases"] / m) if m > 0 else g["cases"] * 0.0
+        for wk, c in zip(g["week"].astype(int), norm):
+            per_rows.append({"year": int(y), "week": int(wk), "norm": float(c)})
+    per_year = pd.DataFrame(per_rows)
+    if per_year.empty:
+        return None
+
+    avg = per_year.groupby("week", as_index=False)["norm"].mean().sort_values("week")
+    if smooth and smooth > 1:
+        avg["smooth"] = avg["norm"].rolling(smooth, center=True, min_periods=1).mean()
+    else:
+        avg["smooth"] = avg["norm"]
+
+    peak_week = int(avg.loc[avg["smooth"].idxmax(), "week"])
+    peak_day = int(min(365, max(1, round((peak_week - 0.5) * 7))))
+    # Robust trough/peak (10th/90th percentile of the smoothed cycle) so a single
+    # near-zero week in sparse data does not force the amplitude to "Strong".
+    sm = avg["smooth"].to_numpy(dtype=float)
+    peak = float(np.nanpercentile(sm, 90))
+    trough = float(np.nanpercentile(sm, 10))
+    ratio = (trough / peak) if peak > 0 else 1.0
+    label = min(_AMPLITUDE_CATS, key=lambda k: abs(_AMPLITUDE_CATS[k] - ratio))
+    # Spread of each year's own peak week — a proxy for how consistent (trustworthy)
+    # the seasonal timing is across years.
+    peak_weeks_by_year = (per_year.sort_values("norm")
+                          .groupby("year")["week"].last())
+    peak_week_spread = float(peak_weeks_by_year.std()) if len(peak_weeks_by_year) > 1 else 0.0
+
+    return {
+        "area": area,
+        "years": sorted(per_year["year"].unique().tolist()),
+        "n_years": int(per_year["year"].nunique()),
+        "peak_week": peak_week,
+        "peak_day": peak_day,
+        "amplitude_ratio": ratio,
+        "amplitude_label": label,
+        "peak_week_spread": peak_week_spread,
+        "source": src,
+        "per_year": per_year,
+        "avg": avg,
+    }
