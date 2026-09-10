@@ -140,7 +140,7 @@ follows the CDC immunization schedule `[6]`.
 
 | Dataset | Use | Provenance |
 |---|---|---|
-| Lane County pertussis case cross‑tab (age × vaccination‑up‑to‑date status; 489 cases) | Age‑distribution + vaccinated‑share calibration targets; seeds the Sₚ share | Lane County pertussis case line‑list, provided by the SOAR/IRS team `[5]`. CSV: `data/observed/lane_county_pertussis.csv` |
+| Observed case cross‑tab — age band × vaccination‑up‑to‑date status (example: Lane County, 489 cases) | Age‑distribution + vaccinated‑share calibration targets; seeds the Sₚ share | Local surveillance line‑list aggregated to the model's bands `[5]` — required form in **Appendix A**. Example CSV: `data/observed/lane_county_pertussis.csv` |
 | CDC NNDSS weekly pertussis (Socrata `x9gk-5huc`) | Weekly case‑curve shape target (R₀/seasonality); multi‑year seasonality estimate | CDC NNDSS provisional weekly data `[8]`; **provisional — undercounts vs finalized annual** |
 | Small‑numbers suppression | Data‑handling constraint | OHA "Guidelines for Reporting Small Numbers to Protect Confidentiality," v2 (2015): denominator ≥ 50 primary rule; program count thresholds (e.g. ≥5) `[11]` |
 
@@ -152,13 +152,68 @@ follows the CDC immunization schedule `[6]`.
 2. Lavine JS, King AA, Bjørnstad ON. Natural immune boosting in pertussis dynamics and the potential for long‑term vaccine failure. *Proc Natl Acad Sci USA.* 2011;108(17):7259–7264. doi:10.1073/pnas.1014394108
 3. Mistry D, Litvinova M, Pastore y Piontti A, et al. Inferring high‑resolution human mixing patterns for disease modeling. *Nat Commun.* 2021;12:323. doi:10.1038/s41467-020-20544-y
 4. Toni T, Welch D, Strelkowa N, Ipsen A, Stumpf MPH. Approximate Bayesian computation scheme for parameter inference and model selection in dynamical systems. *J R Soc Interface.* 2009;6(31):187–202. doi:10.1098/rsif.2008.0172
-5. Lane County pertussis case line‑list, provided by the SOAR / International Responder Systems team. (Not independently published; see `docs/` System Description §13.1.)
+5. Observed case cross‑tabulation by age band × vaccination‑up‑to‑date status — a local surveillance line‑list aggregated to the model's age bands. **Required form, file format, and small‑cell handling: see Appendix A.** Example instance: Lane County, Oregon pertussis line‑list, provided by the SOAR / International Responder Systems team (489 cases; not independently published; see also System Description §13.1).
 6. Havers FP, Moro PL, Hariri S, et al. Pertussis. In: *Epidemiology and Prevention of Vaccine‑Preventable Diseases* (Pink Book). 14th ed. Atlanta, GA: CDC; 2021. Ch. 16.
 7. Delamater PL, Street EJ, Leslie TF, Yang YT, Jacobsen KH. Complexity of the Basic Reproduction Number (R₀). *Emerg Infect Dis.* 2019;25(1):1–4. doi:10.3201/eid2501.171901 (Notes the pertussis R₀ 12–17 origin in 1908–1917 data.)
 8. CDC National Notifiable Diseases Surveillance System (NNDSS) — Weekly Data. data.cdc.gov dataset `x9gk-5huc`. (Provisional weekly counts; see also cdc.gov/pertussis surveillance.)
 9. CDC. 2023 Provisional Pertussis Surveillance Report (age‑specific hospitalization percentages). cdc.gov/pertussis.
 10. Gozzi N, Chinazzi M, Davis JT, Gioannini C, Rossi L, Ajelli M, Perra N, Vespignani A. Epydemix: an open‑source Python package for epidemic modeling with integrated approximate Bayesian calibration. *PLoS Comput Biol.* 2025;21(11):e1013735. doi:10.1371/journal.pcbi.1013735  ·  Contact/population data: epydemix‑data (github.com/epistorm/epydemix-data).
 11. Oregon Public Health Division. Guidelines for Reporting Small Numbers to Protect Confidentiality, Version 2. March 2015.
+
+---
+
+## Appendix A — Observed case data: required form & example
+
+**Required form.** Calibration and outbreak‑seeding need an observed **case
+cross‑tabulation**: confirmed case counts broken down by **age** and
+**vaccination‑up‑to‑date status**. The status maps onto the model's two tracks:
+
+| Status column | Meaning | Model track |
+|---|---|---|
+| **No** | not up to date on vaccination | naive (I / E→I) |
+| **Yes** | up to date | partial (Iₚ / Eₚ→Iₚ) |
+| **Unknown** | status not established | allocated within band by the known No:Yes ratio |
+
+**File format.** A CSV in `data/observed/` with an optional metadata header and one
+row per age label:
+
+```
+# name: <dataset name shown in the app>
+# geography_hint: <epydemix location, e.g. United_States__Oregon__Lane_County>
+# note: <one-line description>
+# source: <provenance statement>
+age_label,No,Unknown,Yes
+0,16,0,13
+1-6,45,3,44
+50+,9,1,8
+```
+
+`age_label` accepts single years, `lo-hi` bands, or an open `50+`; all are
+auto‑aggregated to the model's seven bands. Any CSV in `data/observed/` appears
+automatically in the app's dataset dropdown.
+
+**How it's used.** It supplies two *scale‑free* calibration targets — the case
+**age distribution** and the **vaccinated (partial) share** = Yes ÷ (Yes + No) — and
+seeds the Sₚ share of the immune pool. It is **not** a time series; the weekly
+epidemic‑curve target is drawn separately from CDC NNDSS `[8]`.
+
+**Small‑cell suppression.** Health departments commonly suppress cells with counts
+below a threshold (often < 5) and require a denominator ≥ 50 (OHA rule `[11]`). To
+avoid suppression, request the data **pre‑aggregated to the model's seven bands ×
+{up‑to‑date, not up‑to‑date}** — at that granularity band totals are well above both
+thresholds. Where a cell is still suppressed, treat it as the interval **[1, 4]**,
+never as 0.
+
+**Example instance — Lane County, Oregon.** The bundled dataset
+(`data/observed/lane_county_pertussis.csv`) is a Lane County pertussis line‑list
+provided by the SOAR/IRS team: **489 cases (160 No / 18 Unknown / 311 Yes)**, an
+overall **~66 % vaccinated share**. Its single‑year rows start at age 1 and fold 65+
+into "50+", so the model's 0‑1 and 65+ bands show zero observed cases for this source.
+
+**Caveat.** The vaccinated share of *cases* is **not** population vaccination
+*coverage* — in a highly vaccinated population many cases are breakthroughs. Use it
+as a structural calibration target, not as a coverage estimate; substitute registry
+coverage (e.g. Oregon ALERT IIS) where a true denominator is available.
 
 ---
 
