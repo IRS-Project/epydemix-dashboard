@@ -154,7 +154,7 @@ follows the CDC immunization schedule `[6]`.
 4. Toni T, Welch D, Strelkowa N, Ipsen A, Stumpf MPH. Approximate Bayesian computation scheme for parameter inference and model selection in dynamical systems. *J R Soc Interface.* 2009;6(31):187–202. doi:10.1098/rsif.2008.0172
 5. Lane County pertussis case line‑list, provided by the SOAR / International Responder Systems team. (Not independently published; see `docs/` System Description §13.1.)
 6. Havers FP, Moro PL, Hariri S, et al. Pertussis. In: *Epidemiology and Prevention of Vaccine‑Preventable Diseases* (Pink Book). 14th ed. Atlanta, GA: CDC; 2021. Ch. 16.
-7. CDC. Complexity of the Basic Reproduction Number (R₀). *Emerg Infect Dis.* 2019;25(1). (Notes the pertussis R₀ 12–17 origin in 1908–1917 data.)
+7. Delamater PL, Street EJ, Leslie TF, Yang YT, Jacobsen KH. Complexity of the Basic Reproduction Number (R₀). *Emerg Infect Dis.* 2019;25(1):1–4. doi:10.3201/eid2501.171901 (Notes the pertussis R₀ 12–17 origin in 1908–1917 data.)
 8. CDC National Notifiable Diseases Surveillance System (NNDSS) — Weekly Data. data.cdc.gov dataset `x9gk-5huc`. (Provisional weekly counts; see also cdc.gov/pertussis surveillance.)
 9. CDC. 2023 Provisional Pertussis Surveillance Report (age‑specific hospitalization percentages). cdc.gov/pertussis.
 10. Gozzi N, Chinazzi M, Davis JT, Gioannini C, Rossi L, Ajelli M, Perra N, Vespignani A. Epydemix: an open‑source Python package for epidemic modeling with integrated approximate Bayesian calibration. *PLoS Comput Biol.* 2025;21(11):e1013735. doi:10.1371/journal.pcbi.1013735  ·  Contact/population data: epydemix‑data (github.com/epistorm/epydemix-data).
