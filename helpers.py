@@ -7,13 +7,31 @@ from epydemix.population import load_epydemix_population, Population
 from epydemix.utils import compute_simulation_dates
 from collections import Counter
 from typing import Sequence, Any
-from constants import START_DATE
+from constants import START_DATE, build_age_group_mapping
 from datetime import timedelta
+
+_EPYDEMIX_DATA_BASE = "https://raw.githubusercontent.com/epistorm/epydemix-data/main/"
+
+
+@st.cache_data
+def _age_group_names(geography: str):
+    """Single-year demographic group names for a location (e.g. '0'…'84+'),
+    used to build the age-band mapping without hard-coding the top group."""
+    df = pd.read_csv(f"{_EPYDEMIX_DATA_BASE}data/{geography}/demographic/age_distribution.csv")
+    return list(df["group_name"].astype(str).values)
 
 
 @st.cache_data
 def load_population(geography: str) -> Population:
-    return load_epydemix_population(geography)
+    # Aggregate the single-year demographic + contact data to the model's age
+    # bands (constants.AGE_BANDS) via a per-location mapping.
+    try:
+        mapping = build_age_group_mapping(_age_group_names(geography))
+        return load_epydemix_population(geography, age_group_mapping=mapping)
+    except Exception:
+        # Fall back to epydemix's default aggregation if the demographic file
+        # can't be read (keeps the app working rather than hard-failing).
+        return load_epydemix_population(geography)
 
 
 @st.cache_data

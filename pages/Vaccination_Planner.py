@@ -66,8 +66,10 @@ st.caption(
 
 # Pre-fill the builder grid with the DTaP/Tdap schedule mapped onto the age bands
 # (0-4 primary series 92%, 5-19 adolescent booster 90%, adults decennial ~7%).
-_DTAP_COVERAGE = {"0-4": 92.0, "5-19": 90.0, "20-49": 7.0, "50-64": 7.0, "65+": 7.0}
-_DTAP_VE = {"0-4": 80.0, "5-19": 80.0, "20-49": 70.0, "50-64": 70.0, "65+": 70.0}
+_DTAP_COVERAGE = {"0-1": 92.0, "1-6": 92.0, "7-10": 90.0, "11-19": 90.0,
+                  "20-49": 7.0, "50-64": 7.0, "65+": 7.0}
+_DTAP_VE = {"0-1": 80.0, "1-6": 80.0, "7-10": 80.0, "11-19": 80.0,
+            "20-49": 70.0, "50-64": 70.0, "65+": 70.0}
 strat_default = pd.DataFrame(
     {
         "Age group": DEFAULT_AGE_GROUPS,

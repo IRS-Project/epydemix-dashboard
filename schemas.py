@@ -307,7 +307,8 @@ MODEL_PARAM_SCHEMAS = {
             "min": 0.,
             "max": 100.0,
             "step": 0.1,
-            "default": [0.2, 0.5, 1.5, 5., 18.],
+            # One value per model age band (0-1, 1-6, 7-10, 11-19, 20-49, 50-64, 65+).
+            "default": [0.2, 0.3, 0.4, 0.5, 1.5, 5., 18.],
         }
     ]
 }

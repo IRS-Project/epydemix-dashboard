@@ -62,10 +62,14 @@ def _age_label_to_band(label: str) -> str:
         lo = int(label.split("-")[0])
     else:
         lo = int(label)
-    if lo <= 4:
-        return "0-4"
+    if lo < 1:
+        return "0-1"
+    if lo <= 6:
+        return "1-6"
+    if lo <= 10:
+        return "7-10"
     if lo <= 19:
-        return "5-19"
+        return "11-19"
     if lo <= 49:
         return "20-49"
     if lo <= 64:

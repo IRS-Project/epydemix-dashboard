@@ -689,43 +689,43 @@ def render_metrics_tab(primary_id, selected_ids, scenarios, results):
 
 def _hosp_params_editor():
     """Editable hospitalization-model parameters (persisted in session_state)."""
-    st.session_state.setdefault("hosp_params", dict(HOSP_DEFAULTS))
+    st.session_state.setdefault("hosp_params", {k: (dict(v) if isinstance(v, dict) else v)
+                                                for k, v in HOSP_DEFAULTS.items()})
     p = st.session_state["hosp_params"]
+    p.setdefault("ihr", dict(HOSP_DEFAULTS["ihr"]))
     with st.expander("Hospitalization model parameters", expanded=False):
         st.caption(
             "Hospitalizations = incidence × per-case hospitalization ratio (IHR), by "
-            "age and vaccination status. Naive (unvaccinated) IHR per output band; "
+            "age and vaccination status. Naive (unvaccinated) IHR per age band; "
             "partial (vaccinated) cases use partial ratio × the naive IHR. Defaults "
             "reflect published pertussis patterns (CDC) — calibrate locally."
         )
-        c = st.columns(3)
-        p["ihr_infant"] = c[0].number_input("IHR <1 yr", 0.0, 1.0, float(p["ihr_infant"]), 0.01,
-                                            help="Per-case hospitalization prob. for infants <1 yr (naive). CDC: ~1/3.")
-        p["ihr_toddler"] = c[1].number_input("IHR 1-4", 0.0, 1.0, float(p["ihr_toddler"]), 0.01)
-        p["ihr_5_19"] = c[2].number_input("IHR 5-19", 0.0, 1.0, float(p["ihr_5_19"]), 0.005, format="%.3f")
-        c = st.columns(3)
-        p["ihr_20_49"] = c[0].number_input("IHR 20-49", 0.0, 1.0, float(p["ihr_20_49"]), 0.005, format="%.3f")
-        p["ihr_50_64"] = c[1].number_input("IHR 50-64", 0.0, 1.0, float(p["ihr_50_64"]), 0.005, format="%.3f")
-        p["ihr_65p"] = c[2].number_input("IHR 65+", 0.0, 1.0, float(p["ihr_65p"]), 0.005, format="%.3f")
-        c = st.columns(3)
+        st.markdown("**Naive IHR per age band**")
+        bands = HOSP_AGE_GROUPS
+        for row_start in range(0, len(bands), 4):
+            row = bands[row_start:row_start + 4]
+            cols = st.columns(len(row))
+            for col, band in zip(cols, row):
+                cur = float(p["ihr"].get(band, HOSP_DEFAULTS["ihr"].get(band, 0.01)))
+                p["ihr"][band] = col.number_input(f"IHR {band}", 0.0, 1.0, cur, 0.005,
+                                                  format="%.3f", key=f"_ihr_{band}")
+        c = st.columns(2)
         p["partial_ratio"] = c[0].number_input("Partial ratio", 0.0, 1.0, float(p["partial_ratio"]), 0.05,
                                                help="Vaccinated/partial IHR as a fraction of the naive IHR (milder disease).")
-        p["infant_fraction"] = c[1].number_input("Infant share of 0-4", 0.0, 1.0, float(p["infant_fraction"]), 0.05,
-                                                 help="Fraction of 0-4 incidence attributed to infants <1 (for the <1 vs 1-4 split).")
-        p["delay_days"] = c[2].number_input("Onset→hosp delay (days)", 0, 60, int(p["delay_days"]), 1,
+        p["delay_days"] = c[1].number_input("Onset→hosp delay (days)", 0, 60, int(p["delay_days"]), 1,
                                             help="Lag applied to the hospitalization curve. Pertussis ~1-2 weeks.")
     return p
 
 
 def render_hospitalizations_tab(primary_id, selected_ids, scenarios, results):
-    """Hospitalization observation model: incidence × age/status-specific IHR,
-    with 0-4 resolved into <1 and 1-4. A lens on output; does not change dynamics."""
+    """Hospitalization observation model: incidence × age/status-specific IHR per
+    model age band (0-1 is native infants). A lens on output; no dynamics change."""
     model = scenarios[primary_id]["config"]["model"]
     st.caption(
         "Modeled hospitalizations derived from infection incidence (E→I, and Eₚ→Iₚ "
         "for pertussis) via age- and vaccination-status-specific hospitalization "
-        "ratios. The 0–4 band is split into **<1** and **1–4** so the infant burden "
-        "is visible. This is an observation layer — it does not alter transmission."
+        "ratios. The **0-1** (infant) band carries most of the burden. This is an "
+        "observation layer — it does not alter transmission."
     )
     params = _hosp_params_editor()
 
@@ -783,11 +783,12 @@ def render_hospitalizations_tab(primary_id, selected_ids, scenarios, results):
     # Totals table (primary scenario) + metric + download.
     summ = hospitalization_summary(results[primary_id]["transitions"], params, model)
     total = float(summ.loc[summ["age_group"] == "total", "hosp"].iloc[0])
-    infants = float(summ.loc[summ["age_group"] == "<1", "hosp"].iloc[0])
+    _inf = summ.loc[summ["age_group"] == "0-1", "hosp"]
+    infants = float(_inf.iloc[0]) if len(_inf) else 0.0
     m1, m2 = st.columns(2)
     m1.metric("Total modeled hospitalizations", f"{total:,.0f}")
-    m2.metric("Infant (<1) share", f"{(infants / total):.0%}" if total > 0 else "—",
-              help="Share of modeled hospitalizations in infants <1 yr.")
+    m2.metric("Infant (0-1) share", f"{(infants / total):.0%}" if total > 0 else "—",
+              help="Share of modeled hospitalizations in infants <1 yr (the 0-1 band).")
 
     show = summ.copy()
     show["hosp"] = show["hosp"].round(1)
@@ -800,9 +801,9 @@ def render_hospitalizations_tab(primary_id, selected_ids, scenarios, results):
         mime="text/csv",
     )
     st.caption(
-        "Note: infant hospitalization dominates but the 0–4 transmission band is coarse; "
-        "the <1 vs 1–4 split here uses the 'Infant share of 0-4' parameter, not a separate "
-        "infant contact structure. Treat the <1 series as an IHR-scaled view of 0–4 incidence."
+        "Note: the 0-1 (infant) band now comes straight from the model's youngest age "
+        "band, so the infant hospitalization signal is native — no sub-split assumption. "
+        "IHRs are per-band and user-editable above; calibrate to local data."
     )
 
 
