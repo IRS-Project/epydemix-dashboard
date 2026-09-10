@@ -44,6 +44,31 @@ Defaults and ranges as configured in `schemas.py` (`MODEL_PARAM_SCHEMAS["SEIRS (
 
 ---
 
+## 1a. Deriving parameters from data
+
+The formulas below convert locally‑monitored quantities into parameter values (the
+"tactical" recipes also carried in the app tooltips). The **shareable references page
+provides these as live calculators.** For transmissibility/immunity, a full ABC‑SMC
+calibration is preferred over any single point estimate.
+
+| Parameter | Data you need | Formula |
+|---|---|---|
+| R₀ | Two early weekly case counts C₁, C₂ (Δt days apart); generation interval D | r = ln(C₂/C₁)/Δt · R₀ = 1 + r·D |
+| Incubation (1/ε) | Onset − exposure intervals (contact tracing) | mean of the intervals |
+| Infectious — naive (1/γ) | Median onset→effective‑treatment interval m | min(21, m + 5) |
+| Infectious — partial (1/γₚ) | Same, over up‑to‑date (vaccinated) cases | min(21, m + 5) |
+| σ (rel. infectiousness Iₚ) | Secondary‑attack rate of vaccinated vs unvaccinated index cases | σ = SAR(vax) / SAR(unvax) |
+| δ (rel. susceptibility Sₚ) | % cases vaccinated (PCV), population coverage (PPV) | δ = [PCV/(1−PCV)]·[(1−PPV)/PPV]  (= 1 − screening‑method VE) |
+| ω₁ (R→Sₚ) | Years between successive episodes / local surges | ω₁ = mean inter‑episode interval |
+| ω₂ (Rₚ→S) | Assumed total immunity years T, and ω₁ | ω₂ = T − ω₁ |
+| ω₃ (vaccine Sₚ→S) | Initial VE₀, later VEₜ, years t | t½ = t·ln2 / ln(VE₀/VEₜ) |
+| Seasonality peak day | Peak month of monthly counts | day = (month−1)×30 + 15 |
+| Seasonality amplitude | Peak, trough, mean monthly counts | ratio = (peak−trough)/mean → category |
+| Vaccinated share (→ Sₚ seed) | Cases up‑to‑date (Yes), not (No) | Yes / (Yes + No) |
+| Hospitalization ratio (IHR) | Hospitalized and total cases in a band | IHR = hospitalized / cases |
+
+---
+
 ## 2. Initial conditions — SEIRS (Pertussis)
 
 From `INITIAL_CONDITION_DEFAULTS` (`schemas.py`).
