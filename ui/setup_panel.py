@@ -629,6 +629,12 @@ def render_setup_panel(load_locations_fn, model_param_schemas):
 
     with st.expander("Model parameters", expanded=False):
         render_model_params(model, model_param_schemas)
+        st.page_link(
+            "pages/Model_References.py",
+            label="📖 Parameter provenance & references — where these values come from",
+            help="Sources, ranges, priors and evidence tier for every parameter, plus "
+                 "data → parameter calculators.",
+        )
 
     with st.expander("Contact interventions", expanded=False):
         render_contact_interventions()
