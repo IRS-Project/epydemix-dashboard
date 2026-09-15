@@ -22,6 +22,10 @@ $env:NUMEXPR_NUM_THREADS = "1"
 $env:NUMEXPR_MAX_THREADS = "1"
 $env:VECLIB_MAXIMUM_THREADS = "1"
 
+# Put the repo root on sys.path at interpreter startup so sitecustomize.py runs
+# at server boot (registers static MIME types; see sitecustomize.py).
+$env:PYTHONPATH = $PSScriptRoot
+
 $py = ".\venv\Scripts\python.exe"
 if (-not (Test-Path $py)) { $py = "python" }
 

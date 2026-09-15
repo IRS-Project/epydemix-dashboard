@@ -1,11 +1,13 @@
 # pages/Model_References.py
 #
-# Thin click-out to the parameter & data provenance page. The full reference —
-# evidence-tier tables, sourced citations, and the interactive data -> parameter
-# calculators — lives in the shareable HTML artifact; this page just links to it.
-# Source of truth for the content: docs/parameter-references.md.
+# Thin link to the parameter & data provenance document. The full reference is a
+# self-contained, portable HTML page (static/parameter-provenance-v2.html) served
+# by Streamlit's static file server and opened via a RELATIVE url — no external or
+# local-drive dependency. Written source of truth: docs/parameter-references.md;
+# tactical derivation recipes: docs/tactical.txt.
 
 import streamlit as st
+import mime_fix  # noqa: F401  (serve the provenance HTML as a real page; see mime_fix.py)
 
 from layout.header import show_dashboard_header
 from layout.sidebar import render_sidebar
@@ -28,19 +30,23 @@ render_sidebar()
 
 st.markdown("## Model References & Provenance")
 st.caption(
-    "Where every default value, plausible range, prior bound, and data input in the "
-    "pertussis model comes from — each tagged by evidence tier (Literature · "
-    "Lit-informed · Assumption · Data-derived) — plus a calculator for each parameter "
-    "that converts local surveillance data into a value."
+    "Default value, plausible range, description, selection rationale, and citations "
+    "for every pertussis-model parameter (v2)."
 )
 
-ARTIFACT_URL = "https://claude.ai/code/artifact/e82c6144-6f92-4aa8-ae4f-8ab3bbc5f6b2"
-st.link_button("🧬 Open the provenance page & calculators ↗", ARTIFACT_URL,
-               type="primary", use_container_width=False)
+# Relative URL to the portable HTML served from ./static/; opens in a new tab.
+PROVENANCE_URL = "app/static/parameter-provenance-v2.html"
+st.markdown(
+    f'<a href="{PROVENANCE_URL}" target="_blank" rel="noopener" '
+    'style="display:inline-block;background:#0e6b64;color:#fff;text-decoration:none;'
+    'font-weight:600;padding:0.55rem 1.1rem;border-radius:8px;font-size:0.95rem;">'
+    '\U0001F4D6 Open parameter provenance (v2) ↗</a>',
+    unsafe_allow_html=True,
+)
 st.caption(
-    "Opens the shareable HTML in a new tab. It is a private page — use its Share menu "
-    "to grant your team access. The written source of truth is `docs/parameter-references.md` "
-    "in the repository."
+    "Opens the provenance document in a new tab. It is a self-contained, portable HTML file "
+    "in the repository (`static/parameter-provenance-v2.html`) — no external dependencies. "
+    "Tactical “how to derive from data” recipes are in `docs/tactical.txt`."
 )
 
 show_logos()
