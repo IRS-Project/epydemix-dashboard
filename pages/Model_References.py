@@ -1,15 +1,11 @@
 # pages/Model_References.py
 #
-# Parameter & data provenance: rather than rebuild the reference as Streamlit
-# widgets, embed the self-contained HTML page we generated (evidence-tier tables,
-# full sourced reference, and the interactive data -> parameter calculators) via
-# st.components.v1.html so its own CSS/JS run. A link to the shareable claude.ai
-# artifact (the same page) is offered for hand-off.
-
-from pathlib import Path
+# Thin click-out to the parameter & data provenance page. The full reference —
+# evidence-tier tables, sourced citations, and the interactive data -> parameter
+# calculators — lives in the shareable HTML artifact; this page just links to it.
+# Source of truth for the content: docs/parameter-references.md.
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 from layout.header import show_dashboard_header
 from layout.sidebar import render_sidebar
@@ -39,19 +35,12 @@ st.caption(
 )
 
 ARTIFACT_URL = "https://claude.ai/code/artifact/e82c6144-6f92-4aa8-ae4f-8ab3bbc5f6b2"
-st.markdown(
-    f'<a href="{ARTIFACT_URL}" target="_blank" rel="noopener" '
-    'style="color:#4cc9c6;font-weight:600;text-decoration:none;">'
-    '🧬 Open the shareable version in a new tab ↗</a> '
-    '<span style="color:#8a97a0;font-size:0.85rem;">— private artifact; use its Share menu for your team.</span>',
-    unsafe_allow_html=True,
+st.link_button("🧬 Open the provenance page & calculators ↗", ARTIFACT_URL,
+               type="primary", use_container_width=False)
+st.caption(
+    "Opens the shareable HTML in a new tab. It is a private page — use its Share menu "
+    "to grant your team access. The written source of truth is `docs/parameter-references.md` "
+    "in the repository."
 )
-
-# Embed the generated HTML so its calculators and styling run in-app.
-_HTML = Path(__file__).resolve().parent.parent / "static" / "parameter-references.html"
-try:
-    components.html(_HTML.read_text(encoding="utf-8"), height=1500, scrolling=True)
-except FileNotFoundError:
-    st.error(f"Provenance HTML not found at {_HTML}.")
 
 show_logos()
