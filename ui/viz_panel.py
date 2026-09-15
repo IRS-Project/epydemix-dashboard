@@ -10,6 +10,9 @@ from helpers import contact_matrix_df
 from schemas import MODEL_COMPS
 from constants import DEFAULT_AGE_GROUPS
 from collections import OrderedDict
+from engine.hospitalization import (
+    HOSP_AGE_GROUPS, HOSP_DEFAULTS, hospitalizations_from_trans, hospitalization_summary,
+)
 
 ages_to_idx = {ag: i for i, ag in enumerate(DEFAULT_AGE_GROUPS)}
 
@@ -330,35 +333,122 @@ def render_compartment_timeseries(compartments, selected_ids, scenarios, results
     with col1:
         comp_idx = np.where(np.array(compartments) == "I")[0][0]
         comp = st.selectbox("Compartment", options=compartments, index=int(comp_idx))
-    
+
     with col2:
         total_ages = ["total"] + DEFAULT_AGE_GROUPS
         age = st.selectbox("Age group", options=total_ages, index=0)
+
+    band_choice = st.radio(
+        "Uncertainty band",
+        options=["None", "50%", "90%", "95%"],
+        index=2,
+        horizontal=True,
+        help="Shaded percentile band around the median across the stochastic replicates: "
+             "50% = 25th–75th, 90% = 5th–95th, 95% = 2.5th–97.5th.",
+    )
+    _BANDS = {"50%": (0.25, 0.75), "90%": (0.05, 0.95), "95%": (0.025, 0.975)}
 
     # ---- Prepare long dataframe for plotting
     series_col = f"{comp}_{age}" if age != "" else comp
 
     rows = []
+    band_rows = []
     for sid in selected_ids:
         df = results[sid]["compartments"]
         if series_col not in df.columns:
             continue  # should not happen due to intersection logic
-        name = scenarios[sid].get("name", sid)
-
-        cfg = scenarios[sid]["config"]
-        label = f"{name}" 
+        label = scenarios[sid].get("name", sid)
 
         tmp = df[["t", series_col]].copy()
         tmp.rename(columns={series_col: "value"}, inplace=True)
         tmp["scenario"] = label
         rows.append(tmp)
 
+        # Single shaded band (selected level) around the median
+        ci = results[sid].get("compartments_ci")
+        if band_choice != "None" and ci is not None and series_col in ci.columns and "quantile" in ci.columns:
+            qlo, qhi = _BANDS[band_choice]
+            lo = ci[np.isclose(ci["quantile"], qlo)][["t", series_col]].rename(columns={series_col: "lo"})
+            hi = ci[np.isclose(ci["quantile"], qhi)][["t", series_col]].rename(columns={series_col: "hi"})
+            bnd = lo.merge(hi, on="t")
+            bnd["scenario"] = label
+            band_rows.append(bnd)
+
     plot_df = pd.concat(rows, ignore_index=True)
 
     series_col_label = series_col.replace("_", " (") + ")"
-    st.caption(f"Showing: {series_col_label}")
 
-    chart = (
+    # ---- Posterior-predictive (parameter-uncertainty) from an ABC-SMC run.
+    # Distinct orange style; can be shown as a band, individual per-draw traces, or both.
+    pp = st.session_state.get("_abc_ppc")
+    pp_area = pp_med = pp_traces = None
+    pp_caption = ""
+    if pp is not None and isinstance(pp.get("compartments_pp"), pd.DataFrame):
+        cpp = pp["compartments_pp"]
+        draws = pp.get("compartments_draws")
+        has_draws = isinstance(draws, pd.DataFrame) and series_col in getattr(draws, "columns", [])
+        modes = ["Off", "Band"] + (["Individual traces", "Band + traces"] if has_draws else [])
+        pcols = st.columns([0.6, 0.4])
+        with pcols[0]:
+            pp_mode = st.radio(
+                "ABC posterior-predictive", modes, index=1, horizontal=True, key="_pp_mode",
+                help="Parameter-uncertainty from the ABC-SMC posterior (parameter sets "
+                     "resampled and each simulated). Band = shaded percentile band + median; "
+                     "Individual traces = one line per posterior draw (spaghetti); Both = overlay.",
+            )
+        with pcols[1]:
+            pp_level = st.radio(
+                "Posterior band level", ["50%", "90%", "95%"], index=2,
+                horizontal=True, key="_pp_band_level", label_visibility="collapsed",
+            )
+        want_band = pp_mode in ("Band", "Band + traces")
+        want_traces = pp_mode in ("Individual traces", "Band + traces")
+
+        if want_band and series_col in cpp.columns and "quantile" in cpp.columns:
+            qlo, qhi = _BANDS[pp_level]
+            plo = cpp[np.isclose(cpp["quantile"], qlo)][["t", series_col]].rename(columns={series_col: "lo"})
+            phi = cpp[np.isclose(cpp["quantile"], qhi)][["t", series_col]].rename(columns={series_col: "hi"})
+            pmed = cpp[np.isclose(cpp["quantile"], 0.5)][["t", series_col]].rename(columns={series_col: "med"})
+            pband = plo.merge(phi, on="t")
+            pp_area = (
+                alt.Chart(pband)
+                .mark_area(opacity=0.18, color="#e8833a")
+                .encode(
+                    x=alt.X("t:Q", title="Day"),
+                    y=alt.Y("lo:Q", title=series_col_label),
+                    y2="hi:Q",
+                    tooltip=[alt.Tooltip("lo:Q", title="Posterior lo"),
+                             alt.Tooltip("hi:Q", title="Posterior hi")],
+                )
+            )
+            pp_med = (
+                alt.Chart(pmed)
+                .mark_line(strokeDash=[5, 3], color="#e8833a", strokeWidth=2)
+                .encode(x="t:Q", y="med:Q",
+                        tooltip=[alt.Tooltip("med:Q", title="Posterior median")])
+            )
+            pp_caption += f"  ·  dashed orange = posterior {pp_level} band"
+
+        if want_traces and has_draws:
+            dtr = draws[["t", "draw", series_col]].rename(columns={series_col: "value"})
+            pp_traces = (
+                alt.Chart(dtr)
+                .mark_line(color="#e8833a", opacity=0.16, strokeWidth=1)
+                .encode(
+                    x=alt.X("t:Q", title="Day"),
+                    y=alt.Y("value:Q", title=series_col_label),
+                    detail="draw:N",
+                    tooltip=[alt.Tooltip("draw:N", title="Draw"), "t:Q",
+                             alt.Tooltip("value:Q", title="Value")],
+                )
+            )
+            pp_caption += f"  ·  {pp['n_draws']} posterior traces"
+
+    st.caption(f"Showing: {series_col_label} (median line)"
+               + (f"  ·  shaded = {band_choice} band" if band_rows else "")
+               + pp_caption)
+
+    line = (
         alt.Chart(plot_df)
         .mark_line()
         .encode(
@@ -367,9 +457,105 @@ def render_compartment_timeseries(compartments, selected_ids, scenarios, results
             color=alt.Color("scenario:N", title="Scenario", scale=alt.Scale(scheme="set2")),
             tooltip=["scenario:N", "t:Q", "value:Q"],
         )
-        .interactive()
     )
+
+    layers = []
+    # Posterior-predictive underneath (parameter uncertainty): band, then traces
+    if pp_area is not None:
+        layers.append(pp_area)
+    if pp_traces is not None:
+        layers.append(pp_traces)
+    if band_rows:
+        band_df = pd.concat(band_rows, ignore_index=True)
+        area = (
+            alt.Chart(band_df)
+            .mark_area(opacity=0.22)
+            .encode(
+                x=alt.X("t:Q", title="Day"),
+                y=alt.Y("lo:Q", title=series_col_label),
+                y2="hi:Q",
+                color=alt.Color("scenario:N", title="Scenario", scale=alt.Scale(scheme="set2"), legend=None),
+                tooltip=["scenario:N", "t:Q", alt.Tooltip("lo:Q", title="Lower"), alt.Tooltip("hi:Q", title="Upper")],
+            )
+        )
+        layers.append(area)
+    layers.append(line)
+    # Posterior-predictive median (dashed) on top
+    if pp_med is not None:
+        layers.append(pp_med)
+
+    chart = alt.layer(*layers).interactive()
     st.altair_chart(chart, use_container_width=True)
+
+
+def _metric_ci_bounds(selected_ids, scenarios, results, metric, model, qlo, qhi):
+    """Per-(scenario, age band) lower/upper bounds for a metric at the requested
+    quantiles, computed from the stored compartment/transition quantile frames.
+    Returns a DataFrame [scenario, age_group, ci_lo, ci_hi] (empty if unavailable).
+    Timing metrics (peak_day) are not supported and yield no rows."""
+    ages = DEFAULT_AGE_GROUPS
+    idx = {a: i for i, a in enumerate(ages)}
+    out = []
+
+    def q_series(df, col, q):
+        if df is None or "quantile" not in df.columns or col not in df.columns:
+            return None
+        return df[np.isclose(df["quantile"], q)][col].to_numpy()
+
+    for sid in selected_ids:
+        name = scenarios[sid].get("name", sid)
+        cfg = scenarios[sid].get("config", {})
+        pop = cfg.get("population")
+        comp_ci = results[sid].get("compartments_ci")
+        trans_ci = results[sid].get("transitions_ci")
+        if pop is None:
+            continue
+        Nk = pop.Nk
+        for ag in ages + ["total"]:
+            n = float(Nk.sum()) if ag == "total" else float(Nk[idx[ag]])
+
+            def peak(q):
+                I = q_series(comp_ci, f"I_{ag}", q)
+                if I is None:
+                    return None
+                Ip = q_series(comp_ci, f"Ip_{ag}", q) if model == "SEIRS (Pertussis)" else None
+                base = (I + Ip) if Ip is not None else I
+                return float(base.max())
+
+            def new_infections(q):
+                E = q_series(trans_ci, f"E_to_I_{ag}", q)
+                if E is None:
+                    return None
+                Ep = q_series(trans_ci, f"Ep_to_Ip_{ag}", q) if model == "SEIRS (Pertussis)" else None
+                s = (E + Ep) if Ep is not None else E
+                return float(s.sum())
+
+            def h_sum(q):
+                H = q_series(comp_ci, f"H_{ag}", q)
+                return float(H.sum()) if H is not None else None
+
+            lo = hi = None
+            if metric == "peak_amplitude":
+                lo, hi = peak(qlo), peak(qhi)
+            elif metric == "total_infections":
+                lo, hi = new_infections(qlo), new_infections(qhi)
+            elif metric == "attack_rate":
+                a, b = new_infections(qlo), new_infections(qhi)
+                if a is not None and n > 0:
+                    lo, hi = 100.0 * a / n, 100.0 * b / n
+            elif metric == "hospitalizations":
+                lo, hi = h_sum(qlo), h_sum(qhi)
+            elif metric == "hospitalization_rate":
+                a, b = h_sum(qlo), h_sum(qhi)
+                if a is not None and n > 0:
+                    lo, hi = 100.0 * a / n, 100.0 * b / n
+
+            if lo is not None and hi is not None:
+                if lo > hi:
+                    lo, hi = hi, lo
+                out.append({"scenario": name, "age_group": ag, "ci_lo": lo, "ci_hi": hi})
+
+    return pd.DataFrame(out)
 
 
 def render_metrics_tab(primary_id, selected_ids, scenarios, results):
@@ -434,18 +620,36 @@ def render_metrics_tab(primary_id, selected_ids, scenarios, results):
     metrics = metrics.copy()
     metrics["scenario_label"] = metrics["scenario"].astype(str)
 
-    chart = (
+    # Optional percentile error bars (Absolute view; count/rate metrics only)
+    _QMAP = {"50%": (0.25, 0.75), "90%": (0.05, 0.95), "95%": (0.025, 0.975)}
+    _CI_METRICS = {"attack_rate", "total_infections", "peak_amplitude",
+                   "hospitalizations", "hospitalization_rate"}
+    ci_level = st.radio(
+        "Uncertainty interval (error bars)",
+        options=["None", "50%", "90%", "95%"],
+        index=2,
+        horizontal=True,
+        help="Adds percentile error bars to each bar (Absolute view only). 50% = 25th–75th, "
+             "90% = 5th–95th, 95% = 2.5th–97.5th, across the stochastic replicates. Not available "
+             "for Peak Prevalence Day.",
+    )
+    show_err = (view == "Absolute" and ci_level != "None" and metric in _CI_METRICS)
+    if show_err:
+        qlo, qhi = _QMAP[ci_level]
+        ci_bounds = _metric_ci_bounds(selected_ids, scenarios, results, metric, model, qlo, qhi)
+        if ci_bounds is not None and not ci_bounds.empty:
+            metrics = metrics.merge(ci_bounds, on=["scenario", "age_group"], how="left")
+        else:
+            show_err = False
+
+    bar = (
         alt.Chart(metrics)
         .mark_bar()
         .encode(
-            x=alt.X(
-                "age_group:N", 
-                title="Age group", 
-                sort=DEFAULT_AGE_GROUPS + ["total"]
-            ),
+            x=alt.X("age_group:N", title="Age group", sort=DEFAULT_AGE_GROUPS + ["total"]),
             y=alt.Y(f"{value_col}:Q", title=y_title),
             color=alt.Color("scenario:N", title="Scenario", scale=alt.Scale(scheme="set2")),
-            xOffset="scenario:N",  
+            xOffset="scenario:N",
             tooltip=[
                 "scenario:N",
                 "age_group:N",
@@ -453,6 +657,23 @@ def render_metrics_tab(primary_id, selected_ids, scenarios, results):
             ],
         )
     )
+
+    chart = bar
+    if show_err and "ci_lo" in metrics.columns:
+        err = (
+            alt.Chart(metrics)
+            .mark_rule(strokeWidth=1.6, color="#5f6b7a")
+            .encode(
+                x=alt.X("age_group:N", sort=DEFAULT_AGE_GROUPS + ["total"]),
+                xOffset="scenario:N",
+                y=alt.Y("ci_lo:Q"),
+                y2="ci_hi:Q",
+                tooltip=["scenario:N", "age_group:N",
+                         alt.Tooltip("ci_lo:Q", title="Lower"), alt.Tooltip("ci_hi:Q", title="Upper")],
+            )
+        )
+        chart = alt.layer(bar, err)
+        st.caption(f"Error bars: {ci_level} interval across stochastic replicates.")
 
     st.altair_chart(chart, use_container_width=True)
 
@@ -463,6 +684,126 @@ def render_metrics_tab(primary_id, selected_ids, scenarios, results):
         data=csv,
         file_name="scenario_metrics_with_deltas.csv",
         mime="text/csv",
+    )
+
+
+def _hosp_params_editor():
+    """Editable hospitalization-model parameters (persisted in session_state)."""
+    st.session_state.setdefault("hosp_params", {k: (dict(v) if isinstance(v, dict) else v)
+                                                for k, v in HOSP_DEFAULTS.items()})
+    p = st.session_state["hosp_params"]
+    p.setdefault("ihr", dict(HOSP_DEFAULTS["ihr"]))
+    with st.expander("Hospitalization model parameters", expanded=False):
+        st.caption(
+            "Hospitalizations = incidence × per-case hospitalization ratio (IHR), by "
+            "age and vaccination status. Naive (unvaccinated) IHR per age band; "
+            "partial (vaccinated) cases use partial ratio × the naive IHR. Defaults "
+            "reflect published pertussis patterns (CDC) — calibrate locally."
+        )
+        st.markdown("**Naive IHR per age band**")
+        bands = HOSP_AGE_GROUPS
+        for row_start in range(0, len(bands), 4):
+            row = bands[row_start:row_start + 4]
+            cols = st.columns(len(row))
+            for col, band in zip(cols, row):
+                cur = float(p["ihr"].get(band, HOSP_DEFAULTS["ihr"].get(band, 0.01)))
+                p["ihr"][band] = col.number_input(f"IHR {band}", 0.0, 1.0, cur, 0.005,
+                                                  format="%.3f", key=f"_ihr_{band}")
+        c = st.columns(2)
+        p["partial_ratio"] = c[0].number_input("Partial ratio", 0.0, 1.0, float(p["partial_ratio"]), 0.05,
+                                               help="Vaccinated/partial IHR as a fraction of the naive IHR (milder disease).")
+        p["delay_days"] = c[1].number_input("Onset→hosp delay (days)", 0, 60, int(p["delay_days"]), 1,
+                                            help="Lag applied to the hospitalization curve. Pertussis ~1-2 weeks.")
+    return p
+
+
+def render_hospitalizations_tab(primary_id, selected_ids, scenarios, results):
+    """Hospitalization observation model: incidence × age/status-specific IHR per
+    model age band (0-1 is native infants). A lens on output; no dynamics change."""
+    model = scenarios[primary_id]["config"]["model"]
+    st.caption(
+        "Modeled hospitalizations derived from infection incidence (E→I, and Eₚ→Iₚ "
+        "for pertussis) via age- and vaccination-status-specific hospitalization "
+        "ratios. The **0-1** (infant) band carries most of the burden. This is an "
+        "observation layer — it does not alter transmission."
+    )
+    params = _hosp_params_editor()
+
+    view = st.radio("View", ["Weekly", "Cumulative"], horizontal=True, key="_hosp_view")
+
+    # Build a per-scenario, per-age hospitalization frame.
+    frames = []
+    for sid in selected_ids:
+        daily = hospitalizations_from_trans(results[sid]["transitions"], params, model)
+        daily["week"] = (daily["t"] - 1) // 7
+        if view == "Weekly":
+            agg = daily.groupby(["week", "age_group"], as_index=False)["hosp"].sum()
+            agg = agg.rename(columns={"week": "x"})
+        else:
+            daily = daily.sort_values("t")
+            daily["hosp"] = daily.groupby("age_group")["hosp"].cumsum()
+            agg = daily.rename(columns={"t": "x"})[["x", "age_group", "hosp"]]
+        agg["scenario"] = scenarios[sid].get("name", sid)
+        frames.append(agg)
+    plot_df = pd.concat(frames, ignore_index=True)
+
+    x_title = "Week" if view == "Weekly" else "Day"
+    y_title = "Hospitalizations (weekly)" if view == "Weekly" else "Cumulative hospitalizations"
+
+    # For a single scenario colour by age band; for several, colour by scenario + facet age.
+    if len(selected_ids) == 1:
+        chart = (
+            alt.Chart(plot_df)
+            .mark_line()
+            .encode(
+                x=alt.X("x:Q", title=x_title),
+                y=alt.Y("hosp:Q", title=y_title),
+                color=alt.Color("age_group:N", title="Age band",
+                                sort=HOSP_AGE_GROUPS, scale=alt.Scale(scheme="tableau10")),
+                tooltip=["age_group:N", alt.Tooltip("x:Q", title=x_title),
+                         alt.Tooltip("hosp:Q", title="Hospitalizations", format=".1f")],
+            )
+            .interactive()
+        )
+    else:
+        chart = (
+            alt.Chart(plot_df)
+            .mark_line()
+            .encode(
+                x=alt.X("x:Q", title=x_title),
+                y=alt.Y("hosp:Q", title=y_title),
+                color=alt.Color("scenario:N", title="Scenario", scale=alt.Scale(scheme="set2")),
+                facet=alt.Facet("age_group:N", columns=3, sort=HOSP_AGE_GROUPS, title=None),
+                tooltip=["scenario:N", "age_group:N", alt.Tooltip("hosp:Q", format=".1f")],
+            )
+            .properties(width=200, height=140)
+        )
+    st.altair_chart(chart, use_container_width=True)
+
+    # Totals table (primary scenario) + metric + download.
+    summ = hospitalization_summary(results[primary_id]["transitions"], params, model)
+    total = float(summ.loc[summ["age_group"] == "total", "hosp"].iloc[0])
+    _inf = summ.loc[summ["age_group"] == "0-1", "hosp"]
+    infants = float(_inf.iloc[0]) if len(_inf) else 0.0
+    m1, m2 = st.columns(2)
+    m1.metric("Total modeled hospitalizations", f"{total:,.0f}")
+    m2.metric("Infant (0-1) share", f"{(infants / total):.0%}" if total > 0 else "—",
+              help="Share of modeled hospitalizations in infants <1 yr (the 0-1 band).")
+
+    show = summ.copy()
+    show["hosp"] = show["hosp"].round(1)
+    show = show.rename(columns={"age_group": "Age band", "hosp": "Hospitalizations"})
+    st.dataframe(show, hide_index=True, use_container_width=True)
+    st.download_button(
+        "Download hospitalizations (CSV)",
+        data=plot_df.to_csv(index=False).encode("utf-8"),
+        file_name=f"hospitalizations_{view.lower()}_{model}.csv",
+        mime="text/csv",
+    )
+    st.caption(
+        "Note: the 0-1 (infant) band now comes straight from the model's youngest age "
+        "band, so the infant hospitalization signal is native — no sub-split assumption. "
+        "IHRs are per-band and user-editable above; calibrate to local data."
     )
 
 
@@ -644,7 +985,7 @@ def render_demographic_and_contacts_tab(
             matrices=contact_matrices,
             groups=population.Nk_names,
             facecolor="#0c1019",
-            cmap="oranges",
+            cmap=("#9fb6d4", "#e9e4dd", "#e8933f"),  # light blue -> neutral -> orange
         )
 
     # Contacts-by-setting summary (age-mixing story across home/school/work/community)
@@ -743,11 +1084,16 @@ def render_viz_panel(model: str, geography: str) -> None:
     selected_ids = [primary_id] + compare_ids
 
     has_observed = bool(scenarios[primary_id]["config"].get("observed_dataset"))
-    tab_labels = ["Trajectories", "Summary metrics", "Contact Interventions", "Vaccinations", "Population"]
+    tab_labels = ["Trajectories", "Summary metrics", "Hospitalizations",
+                  "Contact Interventions", "Vaccinations", "Population"]
     if has_observed:
         tab_labels.append("Observed vs modeled")
     _tabs = st.tabs(tab_labels)
-    tab_ts, tab_metrics, tab_contact_interventions, tab_vaccinations, tab_population = _tabs[:5]
+    (tab_ts, tab_metrics, tab_hosp, tab_contact_interventions,
+     tab_vaccinations, tab_population) = _tabs[:6]
+
+    with tab_hosp:
+        render_hospitalizations_tab(primary_id, selected_ids, scenarios, results)
 
     with tab_ts:
         render_compartment_timeseries(MODEL_COMPS[model], selected_ids, scenarios, results)
@@ -806,5 +1152,5 @@ def render_viz_panel(model: str, geography: str) -> None:
         )
 
     if has_observed:
-        with _tabs[5]:
+        with _tabs[6]:
             render_observed_comparison(primary_id, scenarios, results)

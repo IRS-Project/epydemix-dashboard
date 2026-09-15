@@ -1,0 +1,80 @@
+EpyScenario — Pertussis parameters: tactical "how to derive from local data" guidance
+=======================================================================================
+
+This file holds the operational recipes for estimating each pertussis model
+parameter from locally-monitored surveillance data. It was moved out of the
+in-app parameter tooltips (which now carry Description + Default rationale) so the
+tooltips stay concise; the same recipes also drive the interactive calculators on
+the Model References page. Keep this in sync with schemas.py (SEIRS Pertussis)
+and pages/Model_References calculators.
+
+R0 — Basic reproduction number
+  How to derive: fit to the early exponential growth rate r of local case counts,
+    R0 ≈ 1 + r·D, where D is the generation interval (≈ incubation + infectious
+    period ≈ 30 days). Prefer a full ABC-SMC calibration to the weekly curve — the
+    1+r·D shortcut understates R0 for a long-generation pathogen like pertussis.
+  Tactical: from two early weekly case counts C1 then C2 on the rising limb,
+    r = ln(C2/C1)/(days between) per day, so R0 ≈ 1 + r×30.
+
+Incubation period (1/epsilon)
+  How to derive: CDC/clinical references, or contact-tracing data (mean
+    exposure-to-symptom-onset interval).
+  Tactical: average of (cough-onset date − exposure date) across investigated
+    cases with a single identifiable exposure.
+
+Infectious period — naive (1/gamma)
+  How to derive: communicability guidance, or the observed serial interval minus
+    the latent period.
+  Tactical: median of (effective-treatment-start date − cough-onset date) + 5 days,
+    capped at ~21 days if untreated.
+
+Infectious period — partial (1/gamma_p)
+  How to derive: studies of vaccinated / previously-infected cases, or set as a
+    fraction of the naive infectious period (must stay <= naive).
+  Tactical: the same onset-to-treatment calculation, computed only over up-to-date
+    (vaccinated) cases in the line list.
+
+Relative infectiousness of Ip (sigma)
+  How to derive: secondary-attack-rate studies comparing vaccinated vs
+    unvaccinated index cases (typically 0.1–0.5). Primary calibration target.
+  Tactical: sigma = (secondary cases per contact of vaccinated index cases) ÷
+    (secondary cases per contact of unvaccinated index cases), from contact
+    investigations.
+
+Relative susceptibility of Sp (delta)
+  How to derive: vaccine-effectiveness studies; delta ≈ 1 − VE against infection
+    (typically 0.15–0.30).
+  Tactical: delta = 1 − VE, using the screening-method
+    VE = 1 − [PCV/(1−PCV)]·[(1−PPV)/PPV], where PCV = % of cases vaccinated
+    (line list) and PPV = population coverage (immunization registry / IIS).
+
+Waning full->partial (omega_1, years)
+  How to derive: cohort/serological reinfection-interval studies, or fit to the
+    inter-epidemic (surge-to-surge) period in local case series.
+  Tactical: 1/omega_1 ≈ the average number of years between successive pertussis
+    episodes in repeat patients, or the observed interval between local surges.
+
+Waning partial->susceptible (omega_2, years)
+  How to derive: long-term reinfection / serology studies; often set as the
+    estimated total duration of immunity minus the omega_1 phase.
+  Tactical: if no local reinfection data, set 1/omega_2 ≈ (assumed total years of
+    immunity) − (omega_1 years), e.g. 16 − 4 ≈ 12 y.
+
+Waning vaccine Sp->S (omega_3, years)
+  How to derive: vaccine-effectiveness-over-time studies (the annual decline in VE
+    after the primary series).
+  Tactical: stratify cases by years since last dose, compute screening-method VE in
+    each stratum, and read off the years for VE to fall to about half its initial
+    value (VE half-life: t½ = t·ln2 / ln(VE0/VEt)).
+
+Seasonality peak day
+  How to derive: the month-of-onset distribution in local surveillance — take the
+    peak month's mid-point as day-of-year; or use the app's multi-year NNDSS
+    seasonality estimator.
+  Tactical: peak month of monthly case counts → day ≈ (month−1)×30 + 15.
+
+Seasonality amplitude
+  How to derive: the peak-to-trough amplitude of de-trended (seasonally decomposed)
+    local case counts.
+  Tactical: compute (peak-month − trough-month cases) ÷ mean monthly cases — a
+    small ratio maps to 'Low', a large one to 'Strong'.

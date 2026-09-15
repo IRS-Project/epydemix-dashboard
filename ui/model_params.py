@@ -23,6 +23,7 @@ def render_model_params(model: str, model_param_schemas: dict) -> None:
                     value=float(current),
                     step=float(p["step"]),
                     key=widget_key,
+                    help=p.get("help"),
                 )
                 st.session_state["model_params"][model][k] = val
 
@@ -48,11 +49,24 @@ def render_model_params(model: str, model_param_schemas: dict) -> None:
                         st.session_state["model_params"][model][f"{k}_{i}"] = age_val
 
             elif p["type"] == "discrete":
-                val = st.selectbox(p["label"], options=p["options"], index=p["options"].index(current), key=widget_key)
-                st.session_state["model_params"][model][k] = val
-            
-            else:
-                val = st.text_input(p["label"], value=str(current), key=widget_key)
+                labels = p.get("option_labels")
+                idx = p["options"].index(current) if current in p["options"] else 0
+                val = st.selectbox(
+                    p["label"], options=p["options"], index=idx, key=widget_key,
+                    help=p.get("help"),
+                    format_func=(lambda v: labels.get(v, v)) if labels else (lambda v: v),
+                )
                 st.session_state["model_params"][model][k] = val
 
-            
+            else:
+                val = st.text_input(p["label"], value=str(current), key=widget_key, help=p.get("help"))
+                st.session_state["model_params"][model][k] = val
+
+            # Citations for this parameter — a popover next to the "?" help icon.
+            refs = p.get("references")
+            if refs:
+                with st.popover("📚 Ref", use_container_width=False):
+                    st.caption(f"Citations for **{p['label']}**")
+                    for c in refs:
+                        st.markdown(f"- {c}")
+

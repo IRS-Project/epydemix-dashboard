@@ -37,8 +37,8 @@ def default_dtap_campaigns(sim_length: int = 250) -> list[dict]:
         }
 
     return [
-        camp("DTaP primary series (doses 1-5, ages 0-4)", ["0-4"], 0.92, 0.80),
-        camp("Tdap booster (adolescent ~11y)", ["5-19"], 0.90, 0.80),
+        camp("DTaP primary series (doses 1-5, ages 0-6)", ["0-1", "1-6"], 0.92, 0.80),
+        camp("DTaP school-entry / Tdap adolescent booster (7-19)", ["7-10", "11-19"], 0.90, 0.80),
         camp("Td/Tdap decennial booster (adults)", ["20-49", "50-64", "65+"], min(1.0, 0.10 * years), 0.70),
     ]
 

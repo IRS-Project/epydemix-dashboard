@@ -22,13 +22,33 @@ def render_contact_interventions() -> None:
 
         c1, c2, c3, c4 = st.columns([1.25, 1, 1, 1.4], gap="small")
         with c1:
-            layer = st.selectbox("Layer", options=["all"] + LAYER_NAMES, key="_ci_new_layer")
+            layer = st.selectbox(
+                "Layer", options=["all"] + LAYER_NAMES, key="_ci_new_layer",
+                help=("Which contact setting the intervention reduces: home, school, work, community, "
+                      "or all at once. Choose the setting the real measure targets — e.g. a school "
+                      "closure → 'school' (which mainly affects the 5–19 bands that drive pertussis)."),
+            )
         with c2:
-            start_day = st.number_input("Start day", min_value=0, max_value=10_000, step=1, key="_ci_new_start")
+            start_day = st.number_input(
+                "Start day", min_value=0, max_value=10_000, step=1, key="_ci_new_start",
+                help=("Simulation day the intervention begins (day 0 = the run's start date). "
+                      "How to derive: the real policy start date minus your model start date, in days."),
+            )
         with c3:
-            end_day = st.number_input("End day", min_value=0, max_value=10_000, step=1, key="_ci_new_end")
+            end_day = st.number_input(
+                "End day", min_value=0, max_value=10_000, step=1, key="_ci_new_end",
+                help=("Simulation day the intervention ends (must be ≥ start day). "
+                      "How to derive: the real policy end date relative to the model start date."),
+            )
         with c4:
-            red_pct = st.slider("Reduction (%)", min_value=0, max_value=100, step=1, key="_ci_new_red_pct")
+            red_pct = st.slider(
+                "Reduction (%)", min_value=0, max_value=100, step=1, key="_ci_new_red_pct",
+                help=("Percent reduction in contacts within the chosen layer during the window "
+                      "(0 = no effect, 100 = full closure). How to derive: mobility/attendance data "
+                      "(e.g. the observed % drop in school attendance) or the measure's expected effect. "
+                      "Tactical: (1 − attendance-during ÷ attendance-before) × 100, from school-"
+                      "attendance records or a mobility index."),
+            )
 
         add = st.button("Add", type="primary", use_container_width=True)
 

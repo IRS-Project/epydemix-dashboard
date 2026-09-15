@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pertussis Parameter Provenance v2</title>
+<style>
+  :root {
+    --ground:#f5f7f8; --surface:#fff; --surface2:#eef2f3; --ink:#182028; --soft:#4c5a64;
+    --faint:#71828d; --line:#d9e1e4; --lineb:#c2cdd1; --accent:#0e7a78; --accent2:#0b5f5d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --ground:#0e141a; --surface:#151d24; --surface2:#1b252d; --ink:#e7eef2; --soft:#a3b3bd;
+      --faint:#7a8b95; --line:#29343d; --lineb:#384650; --accent:#45c6c3; --accent2:#6fe0dd; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--ground); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased; }
+  .wrap { width:80%; max-width:none; margin:0 auto; padding:clamp(1.25rem,3vw,2.5rem) 0; }
+  header { border-bottom:2px solid var(--ink); padding-bottom:1rem; margin-bottom:1.5rem; }
+  .eyebrow { font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace; font-size:.72rem;
+    letter-spacing:.16em; text-transform:uppercase; color:var(--accent); margin:0 0 .5rem; }
+  h1 { font-size:clamp(1.6rem,3.5vw,2.3rem); margin:0 0 .35rem; letter-spacing:-.01em; }
+  h1 .v { color:var(--accent); font-weight:600; }
+  .lede { color:var(--soft); margin:.2rem 0 0; max-width:75ch; }
+  .meta { margin-top:.8rem; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.74rem; color:var(--faint); }
+  .scroll { overflow-x:auto; border:1px solid var(--line); border-radius:10px; background:var(--surface); }
+  table { width:100%; border-collapse:collapse; font-size:.82rem; table-layout:auto; }
+  thead th { position:sticky; top:0; background:var(--surface2); color:var(--faint);
+    font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.66rem; letter-spacing:.05em; text-transform:uppercase;
+    text-align:left; padding:.35rem .6rem; border-bottom:2px solid var(--lineb); white-space:nowrap; }
+  tbody td { padding:.3rem .6rem; border-bottom:1px solid var(--line); vertical-align:top; line-height:1.3; }
+  tbody tr:nth-child(even) { background:rgba(120,140,150,.08); }
+  .pname { font-weight:700; min-width:11ch; }
+  .sym { font-family:ui-monospace,Menlo,Consolas,monospace; color:var(--accent2); white-space:nowrap; }
+  .units { color:var(--soft); white-space:nowrap; font-size:.78rem; }
+  .desc { color:var(--soft); }
+  .num { font-family:ui-monospace,Menlo,Consolas,monospace; font-variant-numeric:tabular-nums; white-space:nowrap;
+    line-height:1.25; width:1%; }
+  .rat {}
+  .cite { }
+  .cite ul { margin:0; padding-left:1.05em; }
+  .cite li { font-size:.72rem; color:var(--faint); margin-bottom:.15rem; line-height:1.25; }
+  footer { margin-top:1.5rem; padding-top:1rem; border-top:1px solid var(--line); font-size:.8rem; color:var(--faint); }
+  code { font-family:ui-monospace,Menlo,Consolas,monospace; background:var(--surface2); padding:.05em .35em; border-radius:4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">EpyScenario · SOAR / IRS</p>
+    <h1>Pertussis Parameter Provenance <span class="v">v2</span></h1>
+    <p class="lede">Default value, plausible range, description, selection rationale, and citations for every parameter of the 8-compartment SEIRS pertussis model. Values reflect the model configuration (SEIRS Pertussis).</p>
+    <p class="meta">Generated 2026-09-15 · source of truth: schemas.py · tactical &ldquo;how to derive&rdquo; recipes: docs/tactical.txt</p>
+  </header>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Parameter</th><th>Symbol</th><th>Units</th><th>Description</th><th>Default</th><th>Range</th><th>Why this value was selected</th><th>Citations</th></tr></thead>
+      <tbody>
+<tr><td class="pname">Basic reproduction number</td><td class="sym">R₀</td><td class="units">dimensionless</td><td class="desc">Average number of secondary cases from one infectious individual in a fully susceptible population. One of the highest of any vaccine-preventable disease.</td><td class="num">8</td><td class="num">5&nbsp;–&nbsp;17</td><td class="rat">Traditionally the reproduction number used for pertussis is 12–17 (Anderson &amp; May). Delamater et al. show those historic values (1908–1917 U.S.; 1944–1979 England &amp; Wales) are unlikely to match present-day epidemiology, and Kretzschmar et al. (2010) estimate 5–6 using serology + POLYMOD contact matrices. 8 is chosen as a middle value between these disparate ranges.</td><td class="cite"><ul><li>Anderson RM, May RM. Directly transmitted infectious diseases: control by vaccination. Science. 1982;215:1053–1060.</li><li>Kretzschmar M, Teunis PFM, Pebody RG. Incidence and reproduction numbers of pertussis: estimates from serological and social contact data in five European countries. PLoS Med. 2010;7(6):e1000291.</li><li>Delamater PL, Street EJ, Leslie TF, Yang YT, Jacobsen KH. Complexity of the basic reproduction number (R0). Emerg Infect Dis. 2019;25(1):1–4.</li></ul></td></tr>
+<tr><td class="pname">Incubation period</td><td class="sym">1/ε</td><td class="units">days</td><td class="desc">Inverse of the rate at which exposed individuals become infectious (the E→I rate, ε = 1/this). Mean incubation period ≈ 7–10 days.</td><td class="num">9</td><td class="num">3&nbsp;–&nbsp;30</td><td class="rat">The CDC Pink Book gives a typical incubation of 7–10 days; 9 sits at the centre of that modal window, and the 3–30 range accommodates the documented tail.</td><td class="cite"><ul><li>Havers FP, Pedro FML, Hariri S, Skoff T. Chapter 16: Pertussis. In: Epidemiology and Prevention of Vaccine-Preventable Diseases (Pink Book). 14th ed. CDC; 2021.</li></ul></td></tr>
+<tr><td class="pname">Infectious period — naive</td><td class="sym">1/γ</td><td class="units">days</td><td class="desc">Days a fully infectious classic-pertussis case (symptomatic with paroxysmal cough) is infectious — the primary driver of transmission. Sets the recovery rate γ = 1/this.</td><td class="num">15</td><td class="num">5&nbsp;–&nbsp;30</td><td class="rat">Pink Book communicability runs up to ~21 days untreated but is front-loaded in the catarrhal and early paroxysmal stages, and is shortened to ~5 days by effective antibiotics. 15 days is a central &#x27;effective&#x27; infectious period.</td><td class="cite"><ul><li>Havers FP, Pedro FML, Hariri S, Skoff T. Chapter 16: Pertussis. In: Epidemiology and Prevention of Vaccine-Preventable Diseases (Pink Book). 14th ed. CDC; 2021.</li></ul></td></tr>
+<tr><td class="pname">Infectious period — partial</td><td class="sym">1/γₚ</td><td class="units">days</td><td class="desc">Days a partially-immune case is infectious — milder illness, shorter duration, lower infectiousness; often undiagnosed, the &#x27;silent&#x27; adult reservoir.</td><td class="num">12</td><td class="num">5&nbsp;–&nbsp;30</td><td class="rat">Vaccinated / previously-infected cases are clinically milder and shorter (Tozzi 2003; McNamara 2017) yet still transmit (Warfel 2014). Set below the naive period at 12 days (~80% of naive), and always ≤ the naive infectious period.</td><td class="cite"><ul><li>Tozzi AE, Rava L, Ciofi degli Atti ML, Salmaso S. Clinical presentation of pertussis in unvaccinated and vaccinated children in the first six years of life. Pediatrics. 2003;112(5):1069–1075.</li><li>Warfel JM, Zimmerman LI, Merkel TJ. Acellular pertussis vaccines protect against disease but fail to prevent infection and transmission in a nonhuman primate model. Proc Natl Acad Sci USA. 2014;111(2):787–792.</li><li>McNamara LA, et al. Reduced severity of pertussis in persons with age-appropriate pertussis vaccination—United States, 2010–2012. Clin Infect Dis. 2017;65(5):811–818.</li></ul></td></tr>
+<tr><td class="pname">Relative infectiousness</td><td class="sym">σ</td><td class="units">0–1</td><td class="desc">Scales the contribution of Iₚ to the force of infection relative to I (0–1). Reflects milder illness and shorter coughing episodes in partially-immune individuals.</td><td class="num">0.5</td><td class="num">0&nbsp;–&nbsp;1</td><td class="rat">Warfel (2014) showed vaccinated hosts transmit efficiently (σ well above 0), while milder cough and lower shedding argue for a reduction; 0.5 (half a classic case&#x27;s infectiousness) balances the two. A primary ABC-SMC calibration target.</td><td class="cite"><ul><li>Wearing HJ, Rohani P. Estimating the duration of pertussis immunity using epidemiological signatures. PLoS Pathog. 2009;5(10):e1000647.</li><li>Warfel JM, Zimmerman LI, Merkel TJ. Acellular pertussis vaccines protect against disease but fail to prevent infection and transmission in a nonhuman primate model. Proc Natl Acad Sci USA. 2014;111(2):787–792.</li></ul></td></tr>
+<tr><td class="pname">Relative susceptibility</td><td class="sym">δ</td><td class="units">0–1</td><td class="desc">Scales the infection rate of Sₚ relative to S (0–1). Reflects partial protection from prior immunity; lower δ = stronger residual protection.</td><td class="num">0.3</td><td class="num">0&nbsp;–&nbsp;1</td><td class="rat">δ ≈ 1 − VE against infection. Using screening-method VE (Orenstein 1985) and typical pertussis VE of ~70–85%, δ falls in ~0.15–0.30; 0.3 (VE ≈ 70%) is a conservative centre for a pool mixing recently- and remotely-immunised individuals.</td><td class="cite"><ul><li>Orenstein WA, et al. Field evaluation of vaccine efficacy. Bull World Health Organ. 1985;63(6):1055–1068.</li></ul></td></tr>
+<tr><td class="pname">Waning — full → partial</td><td class="sym">ω₁</td><td class="units">years</td><td class="desc">Years over which R loses sterilizing immunity and transitions to Sₚ — the gradual loss of full protection.</td><td class="num">4</td><td class="num">0.5&nbsp;–&nbsp;30</td><td class="rat">Wendelboe (2005) reviews immunity duration (~4–20 y after natural infection, ~4–12 y after vaccination); the initial sterilizing phase is the shorter one, ~4 years.</td><td class="cite"><ul><li>Wendelboe AM, Van Rie A, Salmaso S, Englund JA. Duration of immunity against pertussis after natural infection or vaccination. Pediatr Infect Dis J. 2005;24(5 Suppl):S58–S61.</li></ul></td></tr>
+<tr><td class="pname">Waning — partial → susceptible</td><td class="sym">ω₂</td><td class="units">years</td><td class="desc">Years over which Rₚ loses remaining partial immunity and returns to S. Slower than ω₁ — partial immunity persists longer.</td><td class="num">12</td><td class="num">1&nbsp;–&nbsp;50</td><td class="rat">The residual, non-sterilizing phase outlasts ω₁ (Wendelboe 2005: natural-infection immunity extends toward ~20 y). 12 years keeps the ordering ω₂ &gt; ω₁ and sits within the reviewed range.</td><td class="cite"><ul><li>Wendelboe AM, Van Rie A, Salmaso S, Englund JA. Duration of immunity against pertussis after natural infection or vaccination. Pediatr Infect Dis J. 2005;24(5 Suppl):S58–S61.</li></ul></td></tr>
+<tr><td class="pname">Waning — vaccine (Sₚ → S)</td><td class="sym">ω₃</td><td class="units">years</td><td class="desc">Years over which vaccine-derived partial protection (Sₚ) is lost, returning individuals to full susceptibility (S) — the acellular-vaccine waning behind adolescent resurgence.</td><td class="num">7</td><td class="num">2&nbsp;–&nbsp;12</td><td class="rat">Klein (2012, NEJM) found the odds of pertussis rose ~42% per year after the fifth DTaP dose — rapid waning of acellular protection over roughly five years, the rationale for the Tdap booster at 11–12 y. 7 years is a central estimate spanning rapid (~5 y) and more durable (~10 y) responses.</td><td class="cite"><ul><li>Klein NP, Bartlett J, Rowhani-Rahbar A, Fireman B, Baxter R. Waning protection after fifth dose of acellular pertussis vaccine in children. N Engl J Med. 2012;367(11):1012–1019.</li></ul></td></tr>
+<tr><td class="pname">Seasonality peak day</td><td class="sym">—</td><td class="units">day of year</td><td class="desc">Day of the year (1–365) at which the seasonal transmission multiplier peaks. Pertussis often peaks in late summer / early autumn.</td><td class="num">240</td><td class="num">1&nbsp;–&nbsp;365</td><td class="rat">Fine &amp; Clarkson (1986) documented summer–autumn pertussis seasonality, and US surveillance (CDC NNDSS) shows late-summer/early-autumn peaks; day 240 (late August) is a central value, best refined from local multi-year data.</td><td class="cite"><ul><li>Fine PEM, Clarkson JA. Seasonal influences on pertussis. Int J Epidemiol. 1986;15(2):237–247.</li><li>CDC National Notifiable Diseases Surveillance System (NNDSS) — Weekly Data. data.cdc.gov dataset x9gk-5huc.</li></ul></td></tr>
+<tr><td class="pname">Seasonality amplitude</td><td class="sym">—</td><td class="units">category</td><td class="desc">Strength of the seasonal forcing on transmission (peak-to-trough), from None to Strong.</td><td class="num">Low</td><td class="num">Strong<br>Moderate<br>Medium<br>Weak<br>Low<br>None</td><td class="rat">Pertussis seasonal forcing is weak relative to strongly seasonal childhood infections (Wearing &amp; Rohani 2009; Fine &amp; Clarkson 1986); &#x27;Low&#x27; (~10% peak-to-trough) is typical.</td><td class="cite"><ul><li>Wearing HJ, Rohani P. Estimating the duration of pertussis immunity using epidemiological signatures. PLoS Pathog. 2009;5(10):e1000647.</li><li>Fine PEM, Clarkson JA. Seasonal influences on pertussis. Int J Epidemiol. 1986;15(2):237–247.</li></ul></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <footer>
+    Initial values are literature-informed starting points. R₀, σ (relative infectiousness) and δ (relative susceptibility) are the least-certain and most influential parameters and are refined by the ABC-SMC calibration; treat the defaults as priors, not fixed truths. Tactical recipes for estimating each parameter from local surveillance data are in <code>docs/tactical.txt</code>.
+  </footer>
+</div>
+</body>
+</html>

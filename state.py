@@ -201,10 +201,12 @@ def run_current_scenario(model: str, geography: str) -> str:
     sid = save_current_scenario(model, geography)
     cfg = st.session_state["scenarios"][sid]["config"]
 
-    df_comp, df_trans = run_scenario(cfg)  
+    df_comp, df_trans, ci = run_scenario(cfg)
     st.session_state["results"][sid] = {
         "compartments": df_comp,
         "transitions": df_trans,
+        "compartments_ci": ci["compartments"],
+        "transitions_ci": ci["transitions"],
     }
 
     st.session_state["last_run_scenario_id"] = sid

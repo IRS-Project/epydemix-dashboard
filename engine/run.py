@@ -20,6 +20,28 @@ SEASONALITY_OPTIONS = {
 }
 
 
+# Quantiles kept for uncertainty bands / error bars: median plus the bounds of
+# the 50% (0.25–0.75), 90% (0.05–0.95) and 95% (0.025–0.975) intervals.
+CI_QUANTILES = [0.025, 0.05, 0.25, 0.5, 0.75, 0.95, 0.975]
+
+
+def _quantile_frames(getter, quants=CI_QUANTILES):
+    """Given an epydemix quantile getter (get_quantiles_compartments or
+    get_quantiles_transitions), return (median_df, ci_df).
+
+      - median_df: a 't' column plus one column per series (e.g. I_total, I_0-4),
+        at the median — matches the legacy single-median format.
+      - ci_df: 't', 'quantile' and the same series columns, for every quantile in
+        `quants` — used for the 50 / 90 / 95% uncertainty bands and error bars.
+    """
+    q = getter(quantiles=quants).drop(columns=["date"])
+    # Per-quantile day index (robust to however rows are ordered).
+    q["t"] = q.groupby("quantile").cumcount() + 1
+    median_df = q[np.isclose(q["quantile"], 0.5)].drop(columns=["quantile"]).reset_index(drop=True)
+    ci_df = q.reset_index(drop=True)
+    return median_df, ci_df
+
+
 def create_vaccination_rate_function(eligible_compartments):
     """
     Generator function that creates a vaccination rate computation function.
@@ -296,15 +318,10 @@ def run_seihr_stub(scenario: dict) -> pd.DataFrame:
         )
 
     # Format Output (compartments and transitions)
-    df_median_comp = results.get_quantiles_compartments(quantiles=[0.5])
-    df_median_comp["t"] = np.arange(len(df_median_comp), dtype=int) + 1
-    df_median_comp.drop(columns=["quantile", "date"], inplace=True)
+    df_median_comp, df_comp_ci = _quantile_frames(results.get_quantiles_compartments)
+    df_median_trans, df_trans_ci = _quantile_frames(results.get_quantiles_transitions)
 
-    df_median_trans = results.get_quantiles_transitions(quantiles=[0.5])
-    df_median_trans["t"] = np.arange(len(df_median_trans), dtype=int) + 1
-    df_median_trans.drop(columns=["quantile", "date"], inplace=True)
-
-    return df_median_comp, df_median_trans
+    return df_median_comp, df_median_trans, {"compartments": df_comp_ci, "transitions": df_trans_ci}
 
 
 def run_seirs_stub(scenario: dict) -> pd.DataFrame:
@@ -382,15 +399,10 @@ def run_seirs_stub(scenario: dict) -> pd.DataFrame:
         )
 
     # Format Output (compartments and transitions)
-    df_median_comp = results.get_quantiles_compartments(quantiles=[0.5])
-    df_median_comp["t"] = np.arange(len(df_median_comp), dtype=int) + 1
-    df_median_comp.drop(columns=["quantile", "date"], inplace=True)
+    df_median_comp, df_comp_ci = _quantile_frames(results.get_quantiles_compartments)
+    df_median_trans, df_trans_ci = _quantile_frames(results.get_quantiles_transitions)
 
-    df_median_trans = results.get_quantiles_transitions(quantiles=[0.5])
-    df_median_trans["t"] = np.arange(len(df_median_trans), dtype=int) + 1
-    df_median_trans.drop(columns=["quantile", "date"], inplace=True)
-
-    return df_median_comp, df_median_trans
+    return df_median_comp, df_median_trans, {"compartments": df_comp_ci, "transitions": df_trans_ci}
 
 
 def run_seir_stub(scenario: dict) -> pd.DataFrame:
@@ -457,15 +469,10 @@ def run_seir_stub(scenario: dict) -> pd.DataFrame:
         )
 
     # Format Output (compartments and transitions)
-    df_median_comp = results.get_quantiles_compartments(quantiles=[0.5])
-    df_median_comp["t"] = np.arange(len(df_median_comp), dtype=int) + 1
-    df_median_comp.drop(columns=["quantile", "date"], inplace=True)
+    df_median_comp, df_comp_ci = _quantile_frames(results.get_quantiles_compartments)
+    df_median_trans, df_trans_ci = _quantile_frames(results.get_quantiles_transitions)
 
-    df_median_trans = results.get_quantiles_transitions(quantiles=[0.5])
-    df_median_trans["t"] = np.arange(len(df_median_trans), dtype=int) + 1
-    df_median_trans.drop(columns=["quantile", "date"], inplace=True)
-
-    return df_median_comp, df_median_trans
+    return df_median_comp, df_median_trans, {"compartments": df_comp_ci, "transitions": df_trans_ci}
 
 
 def run_pertussis_stub(scenario: dict) -> pd.DataFrame:
@@ -618,15 +625,10 @@ def run_pertussis_stub(scenario: dict) -> pd.DataFrame:
         )
 
     # Format Output (compartments and transitions)
-    df_median_comp = results.get_quantiles_compartments(quantiles=[0.5])
-    df_median_comp["t"] = np.arange(len(df_median_comp), dtype=int) + 1
-    df_median_comp.drop(columns=["quantile", "date"], inplace=True)
+    df_median_comp, df_comp_ci = _quantile_frames(results.get_quantiles_compartments)
+    df_median_trans, df_trans_ci = _quantile_frames(results.get_quantiles_transitions)
 
-    df_median_trans = results.get_quantiles_transitions(quantiles=[0.5])
-    df_median_trans["t"] = np.arange(len(df_median_trans), dtype=int) + 1
-    df_median_trans.drop(columns=["quantile", "date"], inplace=True)
-
-    return df_median_comp, df_median_trans
+    return df_median_comp, df_median_trans, {"compartments": df_comp_ci, "transitions": df_trans_ci}
 
 
 MODEL_RUNNERS: dict[str, Callable[..., pd.DataFrame]] = {

@@ -15,6 +15,7 @@ except Exception:
 # -----------------------------------------------------------------------------
 
 import streamlit as st
+import mime_fix  # noqa: F401  (serve ./static/*.html as real pages; see mime_fix.py)
 from layout.header import show_dashboard_header
 from layout.sidebar import render_sidebar
 from layout.logos import show_logos
