@@ -117,59 +117,77 @@ MODEL_PARAM_SCHEMAS = {
             "key": "R0",
             "label": "$R_0$",
             "type": "float",
-            "min": 0.1,
-            "max": 20.0,
+            "min": 5.0,
+            "max": 17.0,
             "step": 0.1,
-            "default": 12.0,
-            "help": ("Basic reproduction number — average secondary cases from one infection in a fully "
-                     "susceptible population (defined here on the naive track). Pertussis is among the "
-                     "highest, classically 12–17. How to derive: use published estimates for your "
-                     "setting, or fit to the early exponential growth rate r of local case counts "
-                     "(R₀ ≈ 1 + r·D, where D is the generation interval ≈ incubation + infectious period). "
-                     "Tactical: from two early weekly case counts C₁ then C₂, r = ln(C₂/C₁)/7 per day, "
-                     "so R₀ ≈ 1 + r×30 (≈30-day generation interval)."),
+            "default": 8.0,
+            "help": ("**Description:** Average number of secondary cases from one infectious individual "
+                     "in a fully susceptible population. One of the highest of any vaccine-preventable "
+                     "disease.\n\n"
+                     "**Default rationale:** Traditionally the reproduction number used for pertussis is "
+                     "12–17 (Anderson & May). Delamater et al. show those historic values (1908–1917 U.S.; "
+                     "1944–1979 England & Wales) are unlikely to match present-day epidemiology, and "
+                     "Kretzschmar et al. (2010) estimate 5–6 using serology + POLYMOD contact matrices. "
+                     "8 is chosen as a middle value between these disparate ranges."),
+            "references": [
+                "Anderson RM, May RM. Directly transmitted infectious diseases: control by vaccination. Science. 1982;215:1053–1060.",
+                "Kretzschmar M, Teunis PFM, Pebody RG. Incidence and reproduction numbers of pertussis: estimates from serological and social contact data in five European countries. PLoS Med. 2010;7(6):e1000291.",
+                "Delamater PL, Street EJ, Leslie TF, Yang YT, Jacobsen KH. Complexity of the basic reproduction number (R0). Emerg Infect Dis. 2019;25(1):1–4.",
+            ],
         },
         {
             "key": "incubation_period",
             "label": "Incubation period (days)",
             "type": "float",
-            "min": 0.5,
+            "min": 3.0,
             "max": 30.0,
             "step": 0.5,
             "default": 9.0,
-            "help": ("Mean latent period (days) from infection to becoming infectious; determines the "
-                     "E→I rate (ε = 1/this). Pertussis ≈ 7–10 days. How to derive: CDC/clinical "
-                     "references, or contact-tracing data (mean exposure-to-symptom-onset interval). "
-                     "Tactical: average of (cough-onset date − exposure date) across investigated cases."),
+            "help": ("**Description:** Inverse of the rate at which exposed individuals become infectious "
+                     "(the E→I rate, ε = 1/this). Mean incubation period ≈ 7–10 days.\n\n"
+                     "**Default rationale:** The CDC Pink Book gives a typical incubation of 7–10 days; "
+                     "9 sits at the centre of that modal window, and the 3–30 range accommodates the "
+                     "documented tail."),
+            "references": [
+                "Havers FP, Pedro FML, Hariri S, Skoff T. Chapter 16: Pertussis. In: Epidemiology and Prevention of Vaccine-Preventable Diseases (Pink Book). 14th ed. CDC; 2021.",
+            ],
         },
         {
             "key": "infectious_period",
             "label": "Infectious period — naive $I$ (days)",
             "type": "float",
-            "min": 0.5,
-            "max": 40.0,
+            "min": 5.0,
+            "max": 30.0,
             "step": 0.5,
-            "default": 21.0,
-            "help": ("Mean days a naive (classic) case is infectious; sets the recovery rate (γ = 1/this) "
-                     "and, with R₀, the transmission rate. Pertussis ≈ 14–21 days (catarrhal stage "
-                     "through ~3 weeks of paroxysms; shorter with early antibiotics). How to derive: "
-                     "communicability guidance, or the observed serial interval minus the latent period. "
-                     "Tactical: median of (effective-treatment-start date − cough-onset date) + 5 days, "
-                     "capped at ~21 days if untreated."),
+            "default": 15.0,
+            "help": ("**Description:** Days a fully infectious classic-pertussis case (symptomatic with "
+                     "paroxysmal cough) is infectious — the primary driver of transmission. Sets the "
+                     "recovery rate γ = 1/this.\n\n"
+                     "**Default rationale:** Pink Book communicability runs up to ~21 days untreated but is "
+                     "front-loaded in the catarrhal and early paroxysmal stages, and is shortened to ~5 days "
+                     "by effective antibiotics. 15 days is a central 'effective' infectious period."),
+            "references": [
+                "Havers FP, Pedro FML, Hariri S, Skoff T. Chapter 16: Pertussis. In: Epidemiology and Prevention of Vaccine-Preventable Diseases (Pink Book). 14th ed. CDC; 2021.",
+            ],
         },
         {
             "key": "infectious_period_partial",
             "label": "Infectious period — partial $I_p$ (days)",
             "type": "float",
-            "min": 0.5,
-            "max": 40.0,
+            "min": 5.0,
+            "max": 30.0,
             "step": 0.5,
-            "default": 10.0,
-            "help": ("Mean infectious days for partially-immune (breakthrough) cases — milder and "
-                     "shorter than naive, ≈ 7–14 days. How to derive: studies of vaccinated / "
-                     "previously-infected cases, or set as a fraction of the naive infectious period. "
-                     "Tactical: the same onset-to-treatment calculation, computed only over "
-                     "up-to-date (vaccinated) cases in the line list."),
+            "default": 12.0,
+            "help": ("**Description:** Days a partially-immune case is infectious — milder illness, shorter "
+                     "duration, lower infectiousness; often undiagnosed, the 'silent' adult reservoir.\n\n"
+                     "**Default rationale:** Vaccinated / previously-infected cases are clinically milder and "
+                     "shorter (Tozzi 2003; McNamara 2017) yet still transmit (Warfel 2014). Set below the "
+                     "naive period at 12 days (~80% of naive), and always ≤ the naive infectious period."),
+            "references": [
+                "Tozzi AE, Rava L, Ciofi degli Atti ML, Salmaso S. Clinical presentation of pertussis in unvaccinated and vaccinated children in the first six years of life. Pediatrics. 2003;112(5):1069–1075.",
+                "Warfel JM, Zimmerman LI, Merkel TJ. Acellular pertussis vaccines protect against disease but fail to prevent infection and transmission in a nonhuman primate model. Proc Natl Acad Sci USA. 2014;111(2):787–792.",
+                "McNamara LA, et al. Reduced severity of pertussis in persons with age-appropriate pertussis vaccination—United States, 2010–2012. Clin Infect Dis. 2017;65(5):811–818.",
+            ],
         },
         {
             "key": "rel_infectiousness_partial",
@@ -178,13 +196,18 @@ MODEL_PARAM_SCHEMAS = {
             "min": 0.0,
             "max": 1.0,
             "step": 0.05,
-            "default": 0.2,
-            "help": ("How infectious partial-track cases (Iₚ) are relative to naive cases (I), on a 0–1 "
-                     "scale. Lower means the vaccinated/waned 'silent reservoir' transmits less. "
-                     "How to derive: secondary-attack-rate studies comparing vaccinated vs unvaccinated "
-                     "index cases, or culture-positivity / viral-load ratios (typically 0.1–0.3). "
-                     "Tactical: σ = (secondary cases per contact of vaccinated index cases) ÷ "
-                     "(secondary cases per contact of unvaccinated index cases), from contact investigations."),
+            "default": 0.5,
+            "help": ("**Description:** Scales the contribution of Iₚ to the force of infection relative to I "
+                     "(0–1). Reflects milder illness and shorter coughing episodes in partially-immune "
+                     "individuals.\n\n"
+                     "**Default rationale:** Warfel (2014) showed vaccinated hosts transmit efficiently "
+                     "(σ well above 0), while milder cough and lower shedding argue for a reduction; 0.5 "
+                     "(half a classic case's infectiousness) balances the two. A primary ABC-SMC "
+                     "calibration target."),
+            "references": [
+                "Wearing HJ, Rohani P. Estimating the duration of pertussis immunity using epidemiological signatures. PLoS Pathog. 2009;5(10):e1000647.",
+                "Warfel JM, Zimmerman LI, Merkel TJ. Acellular pertussis vaccines protect against disease but fail to prevent infection and transmission in a nonhuman primate model. Proc Natl Acad Sci USA. 2014;111(2):787–792.",
+            ],
         },
         {
             "key": "rel_susceptibility_partial",
@@ -194,12 +217,15 @@ MODEL_PARAM_SCHEMAS = {
             "max": 1.0,
             "step": 0.05,
             "default": 0.3,
-            "help": ("Susceptibility of partially-immune people (Sₚ) relative to fully susceptible (S), "
-                     "0–1; equals 1 minus effectiveness against infection (δ ≈ 1 − VE). How to derive: "
-                     "vaccine-effectiveness studies, or the infection hazard ratio in previously-immune "
-                     "vs naive cohorts (typically 0.1–0.5). "
-                     "Tactical: δ = 1 − VE, using the screening-method VE = 1 − [PCV/(1−PCV)]·[(1−PPV)/PPV], "
-                     "where PCV = % of cases vaccinated (line list) and PPV = population coverage (IIS)."),
+            "help": ("**Description:** Scales the infection rate of Sₚ relative to S (0–1). Reflects partial "
+                     "protection from prior immunity; lower δ = stronger residual protection.\n\n"
+                     "**Default rationale:** δ ≈ 1 − VE against infection. Using screening-method VE "
+                     "(Orenstein 1985) and typical pertussis VE of ~70–85%, δ falls in ~0.15–0.30; 0.3 "
+                     "(VE ≈ 70%) is a conservative centre for a pool mixing recently- and remotely-immunised "
+                     "individuals."),
+            "references": [
+                "Orenstein WA, et al. Field evaluation of vaccine efficacy. Bull World Health Organ. 1985;63(6):1055–1068.",
+            ],
         },
         {
             "key": "waning_full_to_partial_years",
@@ -209,11 +235,14 @@ MODEL_PARAM_SCHEMAS = {
             "max": 30.0,
             "step": 0.5,
             "default": 4.0,
-            "help": ("Years for strong post-infection immunity to wane to partial (R→Sₚ) ≈ 3–5 y. "
-                     "How to derive: cohort/serological reinfection-interval studies, or fit to the "
-                     "inter-epidemic (surge-to-surge) period in local case series. "
-                     "Tactical: 1/ω₁ ≈ the average number of years between successive pertussis episodes "
-                     "in repeat patients, or the observed interval between local surges."),
+            "help": ("**Description:** Years over which R loses sterilizing immunity and transitions to Sₚ — "
+                     "the gradual loss of full protection.\n\n"
+                     "**Default rationale:** Wendelboe (2005) reviews immunity duration (~4–20 y after "
+                     "natural infection, ~4–12 y after vaccination); the initial sterilizing phase is the "
+                     "shorter one, ~4 years."),
+            "references": [
+                "Wendelboe AM, Van Rie A, Salmaso S, Englund JA. Duration of immunity against pertussis after natural infection or vaccination. Pediatr Infect Dis J. 2005;24(5 Suppl):S58–S61.",
+            ],
         },
         {
             "key": "waning_partial_to_susceptible_years",
@@ -222,35 +251,34 @@ MODEL_PARAM_SCHEMAS = {
             "min": 1.0,
             "max": 50.0,
             "step": 1.0,
-            "default": 15.0,
-            "help": ("Years for residual partial immunity to fully wane (Rₚ→S) ≈ 10–20 y, slower than "
-                     "ω₁. How to derive: long-term reinfection / serology studies; often set as the "
-                     "estimated total duration of immunity minus the ω₁ phase. "
-                     "Tactical: if no local reinfection data, set 1/ω₂ ≈ (assumed total years of immunity) "
-                     "− (ω₁ years) — e.g. 20 − 4 ≈ 15 y."),
+            "default": 12.0,
+            "help": ("**Description:** Years over which Rₚ loses remaining partial immunity and returns to S. "
+                     "Slower than ω₁ — partial immunity persists longer.\n\n"
+                     "**Default rationale:** The residual, non-sterilizing phase outlasts ω₁ (Wendelboe 2005: "
+                     "natural-infection immunity extends toward ~20 y). 12 years keeps the ordering ω₂ > ω₁ "
+                     "and sits within the reviewed range."),
+            "references": [
+                "Wendelboe AM, Van Rie A, Salmaso S, Englund JA. Duration of immunity against pertussis after natural infection or vaccination. Pediatr Infect Dis J. 2005;24(5 Suppl):S58–S61.",
+            ],
         },
-        # Vaccine-derived protection decays too: without this, an individual
-        # vaccinated into Sp stays at reduced susceptibility delta forever
-        # unless infected, since Sp's only other exit is Sp -> Ep. DTaP
-        # protection wanes materially within 5-10 years of the primary series,
-        # which is the documented driver of adolescent resurgence and the
-        # rationale for the 11-year Tdap booster. Set to the max (50 y) to
-        # approximate the previous no-vaccine-waning behaviour.
         {
             "key": "waning_vaccine_to_susceptible_years",
             "label": r"Waning vaccine $S_p\rightarrow S$ ($\omega_3$, years)",
             "type": "float",
-            "min": 1.0,
-            "max": 50.0,
+            "min": 2.0,
+            "max": 12.0,
             "step": 1.0,
-            "default": 10.0,
-            "help": ("Years for vaccine-derived protection to wane (Sₚ→S) ≈ 5–10 y for acellular "
-                     "pertussis (DTaP). This is the documented driver of adolescent resurgence and the "
-                     "rationale for the 11-year Tdap booster. How to derive: vaccine-effectiveness-"
-                     "over-time studies (the annual decline in VE after the primary series). "
-                     "Tactical: stratify cases by years since last dose, compute screening-method VE in "
-                     "each stratum, and read off the number of years for VE to fall to about half its "
-                     "initial value."),
+            "default": 7.0,
+            "help": ("**Description:** Years over which vaccine-derived partial protection (Sₚ) is lost, "
+                     "returning individuals to full susceptibility (S) — the acellular-vaccine waning behind "
+                     "adolescent resurgence.\n\n"
+                     "**Default rationale:** Klein (2012, NEJM) found the odds of pertussis rose ~42% per "
+                     "year after the fifth DTaP dose — rapid waning of acellular protection over roughly five "
+                     "years, the rationale for the Tdap booster at 11–12 y. 7 years is a central estimate "
+                     "spanning rapid (~5 y) and more durable (~10 y) responses."),
+            "references": [
+                "Klein NP, Bartlett J, Rowhani-Rahbar A, Fireman B, Baxter R. Waning protection after fifth dose of acellular pertussis vaccine in children. N Engl J Med. 2012;367(11):1012–1019.",
+            ],
         },
         {
             "key": "seasonality_peak_day",
@@ -260,10 +288,15 @@ MODEL_PARAM_SCHEMAS = {
             "max": 365,
             "step": 1,
             "default": 240,
-            "help": ("Day of the year (1–365) when transmission peaks. Pertussis often peaks in late "
-                     "summer / early autumn (≈ day 210–260). How to derive: the month-of-onset "
-                     "distribution in local surveillance — take the peak month's mid-point as day-of-year. "
-                     "Tactical: peak month of monthly case counts → day ≈ (month−1)×30 + 15."),
+            "help": ("**Description:** Day of the year (1–365) at which the seasonal transmission multiplier "
+                     "peaks. Pertussis often peaks in late summer / early autumn.\n\n"
+                     "**Default rationale:** Fine & Clarkson (1986) documented summer–autumn pertussis "
+                     "seasonality, and US surveillance (CDC NNDSS) shows late-summer/early-autumn peaks; "
+                     "day 240 (late August) is a central value, best refined from local multi-year data."),
+            "references": [
+                "Fine PEM, Clarkson JA. Seasonal influences on pertussis. Int J Epidemiol. 1986;15(2):237–247.",
+                "CDC National Notifiable Diseases Surveillance System (NNDSS) — Weekly Data. data.cdc.gov dataset x9gk-5huc.",
+            ],
         },
         {
             "key": "seasonality_amplitude",
@@ -272,11 +305,15 @@ MODEL_PARAM_SCHEMAS = {
             "options": SEASONALITY_AMPLITUDE_OPTIONS,
             "option_labels": SEASONALITY_AMPLITUDE_LABELS,
             "default": "Low",
-            "help": ("Strength of seasonal forcing on the transmission rate (None → Strong). Pertussis "
-                     "seasonality is weak, so 'Low' is typical. How to derive: the peak-to-trough "
-                     "amplitude of de-trended (seasonally decomposed) local case counts. "
-                     "Tactical: compute (peak-month − trough-month cases) ÷ mean monthly cases — a small "
-                     "ratio maps to 'Low', a large one to 'Strong'."),
+            "help": ("**Description:** Strength of the seasonal forcing on transmission (peak-to-trough), "
+                     "from None to Strong.\n\n"
+                     "**Default rationale:** Pertussis seasonal forcing is weak relative to strongly seasonal "
+                     "childhood infections (Wearing & Rohani 2009; Fine & Clarkson 1986); 'Low' (~10% "
+                     "peak-to-trough) is typical."),
+            "references": [
+                "Wearing HJ, Rohani P. Estimating the duration of pertussis immunity using epidemiological signatures. PLoS Pathog. 2009;5(10):e1000647.",
+                "Fine PEM, Clarkson JA. Seasonal influences on pertussis. Int J Epidemiol. 1986;15(2):237–247.",
+            ],
         }
     ],
     "SEIHR (COVID-19)": [

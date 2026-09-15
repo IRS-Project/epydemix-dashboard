@@ -62,4 +62,11 @@ def render_model_params(model: str, model_param_schemas: dict) -> None:
                 val = st.text_input(p["label"], value=str(current), key=widget_key, help=p.get("help"))
                 st.session_state["model_params"][model][k] = val
 
-            
+            # Citations for this parameter — a popover next to the "?" help icon.
+            refs = p.get("references")
+            if refs:
+                with st.popover("📚 Ref", use_container_width=False):
+                    st.caption(f"Citations for **{p['label']}**")
+                    for c in refs:
+                        st.markdown(f"- {c}")
+
