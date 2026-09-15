@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<title>Pertussis Parameter Provenance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #f5f7f8;
+    --surface: #ffffff;
+    --surface-2: #eef2f3;
+    --ink: #182028;
+    --ink-soft: #4c5a64;
+    --ink-faint: #71828d;
+    --line: #d9e1e4;
+    --line-strong: #c2cdd1;
+    --accent: #0e7a78;
+    --lit: #1f7a4d;
+    --litinf: #2360a5;
+    --assume: #b04e14;
+    --data: #6d34c4;
+    --shadow: 0 1px 2px rgba(24,32,40,.05), 0 3px 12px rgba(24,32,40,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0e141a;
+      --surface: #151d24;
+      --surface-2: #1b252d;
+      --ink: #e7eef2;
+      --ink-soft: #a3b3bd;
+      --ink-faint: #7a8b95;
+      --line: #29343d;
+      --line-strong: #384650;
+      --accent: #45c6c3;
+      --lit: #4bd08a;
+      --litinf: #7db2ee;
+      --assume: #ef9d55;
+      --data: #bd9cf3;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.32);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0e141a;
+    --surface: #151d24;
+    --surface-2: #1b252d;
+    --ink: #e7eef2;
+    --ink-soft: #a3b3bd;
+    --ink-faint: #7a8b95;
+    --line: #29343d;
+    --line-strong: #384650;
+    --accent: #45c6c3;
+    --lit: #4bd08a;
+    --litinf: #7db2ee;
+    --assume: #ef9d55;
+    --data: #bd9cf3;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.32);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Source Sans 3", system-ui, -apple-system, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: clamp(1.5rem, 4vw, 3.5rem) clamp(1rem, 4vw, 2rem) 4rem; }
+
+  /* ---- Masthead ---- */
+  header.masthead { border-bottom: 2px solid var(--ink); padding-bottom: 1.5rem; margin-bottom: 2.5rem; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .72rem; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 .9rem;
+  }
+  h1 {
+    font-family: "Spectral", Georgia, serif;
+    font-weight: 600; font-size: clamp(2rem, 5vw, 3rem);
+    line-height: 1.05; letter-spacing: -.01em; text-wrap: balance;
+    margin: 0 0 .6rem;
+  }
+  .lede { font-size: 1.08rem; color: var(--ink-soft); max-width: 60ch; margin: 0; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: .5rem 1.4rem; margin-top: 1.4rem;
+    font-family: "IBM Plex Mono", monospace; font-size: .76rem; color: var(--ink-faint);
+  }
+  .meta span { white-space: nowrap; }
+  .meta b { color: var(--ink-soft); font-weight: 500; }
+
+  /* ---- Basis legend ---- */
+  .legend {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: .75rem; margin: 0 0 3rem; padding: 1.25rem;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow);
+  }
+  .legend h2 { grid-column: 1 / -1; margin: 0 0 .25rem; font-family:"Spectral",serif; font-weight:500; font-size: 1rem; color: var(--ink-soft); }
+  .legend .item { display: flex; gap: .6rem; align-items: baseline; }
+  .legend .item p { margin: 0; font-size: .86rem; color: var(--ink-soft); }
+  .legend .item p b { color: var(--ink); }
+
+  .chip {
+    display: inline-block; font-family: "IBM Plex Mono", monospace;
+    font-size: .68rem; font-weight: 500; letter-spacing: .02em;
+    padding: .16em .5em; border-radius: 5px; white-space: nowrap; line-height: 1.3;
+    border: 1px solid;
+  }
+  .chip.lit    { color: var(--lit);    border-color: color-mix(in srgb, var(--lit) 45%, transparent);    background: color-mix(in srgb, var(--lit) 11%, transparent); }
+  .chip.litinf { color: var(--litinf); border-color: color-mix(in srgb, var(--litinf) 45%, transparent); background: color-mix(in srgb, var(--litinf) 11%, transparent); }
+  .chip.assume { color: var(--assume); border-color: color-mix(in srgb, var(--assume) 48%, transparent); background: color-mix(in srgb, var(--assume) 12%, transparent); }
+  .chip.data   { color: var(--data);   border-color: color-mix(in srgb, var(--data) 45%, transparent);   background: color-mix(in srgb, var(--data) 12%, transparent); }
+
+  /* ---- Sections ---- */
+  section { margin-bottom: 3rem; }
+  .sec-head { display: flex; align-items: baseline; gap: .8rem; margin: 0 0 1rem; border-bottom: 1px solid var(--line-strong); padding-bottom: .5rem; }
+  .sec-num { font-family:"IBM Plex Mono",monospace; font-size: .85rem; color: var(--accent); font-weight: 500; }
+  h2.sec-title { font-family:"Spectral",serif; font-weight: 600; font-size: 1.4rem; margin: 0; letter-spacing: -.01em; }
+
+  .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  thead th {
+    text-align: left; font-family:"IBM Plex Mono",monospace; font-weight: 500;
+    font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint);
+    background: var(--surface-2); padding: .7rem .85rem; border-bottom: 1px solid var(--line-strong); white-space: nowrap;
+  }
+  tbody td { padding: .65rem .85rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.param { font-weight: 600; color: var(--ink); min-width: 12ch; }
+  td.val { font-family:"IBM Plex Mono",monospace; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink); }
+  td.basis { white-space: nowrap; }
+  td.src { color: var(--ink-soft); font-size: .84rem; }
+  .sym { font-family:"IBM Plex Mono",monospace; font-size: .82em; color: var(--ink-soft); }
+  code, .mono { font-family:"IBM Plex Mono",monospace; font-size: .84em; background: var(--surface-2); padding: .05em .35em; border-radius: 4px; }
+  pre.codeblock { font-family:"IBM Plex Mono",monospace; font-size: .8rem; line-height: 1.55; color: var(--ink);
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 1rem 1.1rem; overflow-x: auto; margin: 1rem 0; }
+  pre.codeblock .cmt { color: var(--ink-faint); }
+  .appendix p { color: var(--ink-soft); max-width: 68ch; }
+  .appendix p b { color: var(--ink); }
+
+  /* ---- Calculators ---- */
+  .calc-intro { color: var(--ink-soft); max-width: 66ch; margin: .2rem 0 0; }
+  .calc-sub { font-family:"Spectral",serif; font-weight: 500; font-size: 1.05rem; color: var(--ink-soft); margin: 1.7rem 0 .5rem; letter-spacing: -.01em; }
+  .calc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 1rem; }
+  .calc { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.1rem; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: .55rem; }
+  .calc-name { font-family:"Spectral",serif; font-weight: 600; font-size: 1.02rem; color: var(--ink); }
+  .calc-name .sym { font-family:"IBM Plex Mono",monospace; font-size: .68em; color: var(--ink-faint); margin-left: .35rem; font-weight: 400; }
+  .calc-derive { font-size: .81rem; color: var(--ink-soft); margin: 0; }
+  .calc-inputs { display: flex; flex-direction: column; gap: .4rem; margin-top: .15rem; }
+  .calc-inputs label { display: flex; justify-content: space-between; align-items: center; gap: .6rem; font-size: .8rem; color: var(--ink-soft); }
+  .calc-inputs input { width: 6rem; font-family:"IBM Plex Mono",monospace; font-size: .82rem; text-align: right; padding: .28rem .45rem; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--ground); color: var(--ink); }
+  .calc-inputs input[data-list] { width: 8.5rem; text-align: left; }
+  .calc-inputs input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .calc-out { margin-top: .15rem; padding-top: .6rem; border-top: 1px dashed var(--line-strong); font-size: .9rem; color: var(--ink-soft); display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+  .calc-out b { font-family:"IBM Plex Mono",monospace; font-size: 1.2rem; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .calc-out .hint { font-size: .74rem; color: var(--assume); font-family:"IBM Plex Mono",monospace; }
+  .calc-formula { font-family:"IBM Plex Mono",monospace; font-size: .71rem; color: var(--ink-faint); margin-top: auto; padding-top: .2rem; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+  a:hover { border-bottom-color: var(--accent); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+  /* ---- Aside notes ---- */
+  .note {
+    margin: 1rem 0 0; padding: .85rem 1.1rem; border-radius: 8px;
+    background: var(--surface-2); border-left: 3px solid var(--accent);
+    font-size: .87rem; color: var(--ink-soft);
+  }
+  .note.warn { border-left-color: var(--assume); }
+  .note b { color: var(--ink); }
+
+  /* ---- References ---- */
+  ol.refs { list-style: none; counter-reset: r; padding: 0; margin: 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: .3rem 2rem; }
+  ol.refs li { counter-increment: r; position: relative; padding: .55rem 0 .55rem 2.4rem; border-bottom: 1px solid var(--line); font-size: .84rem; color: var(--ink-soft); line-height: 1.45; }
+  ol.refs li::before {
+    content: "[" counter(r) "]"; position: absolute; left: 0; top: .55rem;
+    font-family:"IBM Plex Mono",monospace; font-size: .74rem; color: var(--accent); font-weight: 500;
+  }
+  ol.refs cite { font-style: italic; color: var(--ink); }
+  .doi { font-family:"IBM Plex Mono",monospace; font-size: .92em; }
+
+  footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--line); font-size: .8rem; color: var(--ink-faint); }
+  footer .mono { background: none; padding: 0; }
+
+  @media (prefers-reduced-motion: no-preference) { a { transition: border-color .15s ease; } }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow">EpyScenario · SOAR / IRS</p>
+    <h1>Pertussis Parameter Provenance</h1>
+    <p class="lede">Where every default value, plausible range, prior bound, and data input in the age‑structured pertussis model comes from — and how confident that source is.</p>
+    <div class="meta">
+      <span><b>Companion to</b> the System Description</span>
+      <span><b>Model</b> 8‑compartment SEIRS partial‑immunity</span>
+      <span><b>Age bands</b> 0‑1 · 1‑6 · 7‑10 · 11‑19 · 20‑49 · 50‑64 · 65+</span>
+    </div>
+  </header>
+
+  <div class="legend">
+    <h2>Reading the “Basis” column — not all values are equal in pedigree</h2>
+    <div class="item"><span class="chip lit">Literature</span><p>Value or range taken directly from a cited source.</p></div>
+    <div class="item"><span class="chip litinf">Lit‑informed</span><p>A default chosen to sit inside a published range — not a single quoted figure.</p></div>
+    <div class="item"><span class="chip assume">Assumption</span><p><b>Placeholder with no direct source</b> — calibrate to local data before relying on it.</p></div>
+    <div class="item"><span class="chip data">Data‑derived</span><p>Computed from a loaded dataset (Lane County line‑list or CDC NNDSS).</p></div>
+  </div>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">01</span><h2 class="sec-title">Model parameters — SEIRS (Pertussis)</h2></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Parameter</th><th>Default</th><th>Range</th><th>Basis</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr><td class="param">Basic reproduction number <span class="sym">R₀</span></td><td class="val">12</td><td class="val">6 – 18</td><td class="basis"><span class="chip litinf">Lit‑informed</span></td><td class="src">Classic pertussis R₀ 12–17 [6]; the 12–17 figure derives from 1908–1917 data [7]. Fit locally via early growth rate.</td></tr>
+        <tr><td class="param">Incubation period <span class="sym">1/ε</span></td><td class="val">9 d</td><td class="val">0.5 – 30</td><td class="basis"><span class="chip lit">Literature</span></td><td class="src">Pertussis incubation ≈ 7–10 d, CDC Pink Book [6]</td></tr>
+        <tr><td class="param">Infectious period — naive <span class="sym">I (1/γ)</span></td><td class="val">21 d</td><td class="val">0.5 – 40</td><td class="basis"><span class="chip lit">Literature</span></td><td class="src">Catarrhal→paroxysmal communicability ≈ 14–21 d [6]</td></tr>
+        <tr><td class="param">Infectious period — partial <span class="sym">Iₚ</span></td><td class="val">10 d</td><td class="val">0.5 – 40</td><td class="basis"><span class="chip litinf">Lit‑informed</span></td><td class="src">Milder/shorter breakthrough illness (≈7–14 d); set as a fraction of naive [1][6]</td></tr>
+        <tr><td class="param">Rel. infectiousness of Iₚ <span class="sym">σ</span></td><td class="val">0.2</td><td class="val">0 – 1</td><td class="basis"><span class="chip litinf">Lit‑informed</span> <span class="chip assume">Assumption</span></td><td class="src">Vaccinated index cases less infectious (≈0.1–0.3, secondary‑attack studies) [1] — calibrate</td></tr>
+        <tr><td class="param">Rel. susceptibility of Sₚ <span class="sym">δ</span></td><td class="val">0.3</td><td class="val">0 – 1</td><td class="basis"><span class="chip litinf">Lit‑informed</span> <span class="chip assume">Assumption</span></td><td class="src">δ ≈ 1 − VE (≈0.1–0.5) [1][6] — calibrate</td></tr>
+        <tr><td class="param">Waning R→Sₚ <span class="sym">ω₁</span></td><td class="val">4 y</td><td class="val">0.5 – 30</td><td class="basis"><span class="chip lit">Literature</span></td><td class="src">Post‑infection immunity wanes to partial ≈ 3–5 y [1]</td></tr>
+        <tr><td class="param">Waning Rₚ→S <span class="sym">ω₂</span></td><td class="val">15 y</td><td class="val">1 – 50</td><td class="basis"><span class="chip litinf">Lit‑informed</span></td><td class="src">Residual immunity fully wanes ≈ 10–20 y, slower than ω₁ [1][2]</td></tr>
+        <tr><td class="param">Waning vaccine Sₚ→S <span class="sym">ω₃</span></td><td class="val">10 y</td><td class="val">1 – 50</td><td class="basis"><span class="chip lit">Literature</span></td><td class="src">DTaP protection wanes ≈ 5–10 y; drives adolescent resurgence / Tdap‑at‑11 rationale [6]</td></tr>
+        <tr><td class="param">Seasonality peak day</td><td class="val">240</td><td class="val">1 – 365</td><td class="basis"><span class="chip litinf">Lit‑informed</span> <span class="chip data">Data‑derived</span></td><td class="src">Peaks late summer–early autumn [3]; estimable from multi‑year NNDSS in‑app [8]</td></tr>
+        <tr><td class="param">Seasonality amplitude</td><td class="val">Low</td><td class="val">Strong…None</td><td class="basis"><span class="chip litinf">Lit‑informed</span></td><td class="src">Pertussis seasonal forcing is weak [2][3]</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note"><b>ω₃ note.</b> Without vaccine waning, anyone vaccinated into Sₚ would stay at reduced susceptibility indefinitely — biologically wrong for acellular pertussis. ω₃ is the mechanism reproducing waning‑driven adolescent resurgence.</p>
+  </section>
+
+  <section id="calculators">
+    <div class="sec-head"><span class="sec-num">⚙</span><h2 class="sec-title">Derive from your data — calculators</h2></div>
+    <p class="calc-intro">Plug locally‑monitored quantities into these calculators to convert them into model‑parameter values — the same “tactical” formulas carried in the app's tooltips. Fields are pre‑filled with <b>illustrative example values</b>; replace them with your own. For the transmissibility and immunity parameters, a full ABC‑SMC calibration in the app is preferred over any single point estimate.</p>
+
+    <h3 class="calc-sub">Transmission &amp; clinical course</h3>
+    <div class="calc-grid">
+      <div class="calc" data-calc="r0">
+        <div class="calc-name">R₀ <span class="sym">basic reproduction no.</span></div>
+        <p class="calc-derive">Two early weekly case counts during exponential growth.</p>
+        <div class="calc-inputs">
+          <label>Early weekly cases C₁ <input type="number" data-k="c1" value="10" min="0" step="1"></label>
+          <label>Later weekly cases C₂ <input type="number" data-k="c2" value="22" min="0" step="1"></label>
+          <label>Days between <input type="number" data-k="dt" value="7" min="1" step="1"></label>
+          <label>Generation interval (d) <input type="number" data-k="D" value="30" min="1" step="1"></label>
+        </div>
+        <div class="calc-out">R₀ ≈ <b data-out>—</b> <span class="hint" data-hint></span></div>
+        <div class="calc-formula">r = ln(C₂/C₁) / Δt · R₀ = 1 + r·D</div>
+      </div>
+
+      <div class="calc" data-calc="incub">
+        <div class="calc-name">Incubation <span class="sym">1/ε</span></div>
+        <p class="calc-derive">Mean of (symptom onset − exposure) intervals from contact tracing.</p>
+        <div class="calc-inputs">
+          <label>Onset−exposure intervals (d) <input type="text" data-k="samples" data-list value="8, 9, 11, 7"></label>
+        </div>
+        <div class="calc-out">Incubation ≈ <b data-out>—</b> <span class="hint" data-hint></span></div>
+        <div class="calc-formula">mean of the listed intervals (comma‑separated)</div>
+      </div>
+
+      <div class="calc" data-calc="infN">
+        <div class="calc-name">Infectious — naive <span class="sym">1/γ</span></div>
+        <p class="calc-derive">Median onset‑to‑effective‑treatment interval, plus ~5 days, capped at 21 (untreated).</p>
+        <div class="calc-inputs">
+          <label>Median onset→treatment (d) <input type="number" data-k="m" value="16" min="0" step="1"></label>
+        </div>
+        <div class="calc-out">Infectious ≈ <b data-out>—</b> <span class="hint" data-hint></span></div>
+        <div class="calc-formula">min(21, m + 5)</div>
+      </div>
+
+      <div class="calc" data-calc="infP">
+        <div class="calc-name">Infectious — partial <span class="sym">1/γₚ</span></div>
+        <p class="calc-derive">Same calculation, over up‑to‑date (vaccinated) cases only.</p>
+        <div class="calc-inputs">
+          <label>Median onset→treatment (d) <input type="number" data-k="m" value="7" min="0" step="1"></label>
+        </div>
+        <div class="calc-out">Infectious ≈ <b data-out>—</b> <span class="hint" data-hint></span></div>
+        <div class="calc-formula">min(21, m + 5)</div>
+      </div>
+
+      <div class="calc" data-calc="sigma">
+        <div class="calc-name">σ <span class="sym">rel. infectiousness of Iₚ</span></div>
+        <p class="calc-derive">Secondary‑attack rate among contacts of vaccinated vs unvaccinated index cases.</p>
+        <div class="calc-inputs">
+          <label>SAR, vaccinated index <input type="number" data-k="sv" value="0.05" min="0" step="0.01"></label>
+          <label>SAR, unvaccinated index <input type="number" data-k="su" value="0.25" min="0" step="0.01"></label>
+        </div>
+        <div class="calc-out">σ ≈ <b data-out>—</b> <span class="hint" data-hint></span></div>
+        <div class="calc-formula">σ = SAR(vax) / SAR(unvax)</div>
+      </div>
+    </div>
+
+    <h3 class="calc-sub">Immunity &amp; waning</h3>
+    <div class="calc-grid">
+      <div class="calc" data-calc="delta">
+        <div class="calc-name">δ <span class="sym">rel. susceptibility of Sₚ</span></div>
+        <p class="calc-derive">Screening‑method VE from case‑vaccinated % (line list) and population coverage (IIS); δ = 1 − VE.</p>
+        <div class="calc-inputs">
+          <label>% of cases vaccinated (PCV) <input type="number" data-k="pcv" value="66" min="0" max="100" step="1"></label>
+          <label>Population coverage % (PPV) <input type="number" data-k="ppv" value="90" min="0" max="100" step="1"></label>
+        </div>
+        <div class="calc-out">δ ≈ <b data-out>—</b> <span class="hint" data-hint></span></div>
+        <div class="calc-formula">δ = [PCV/(1−PCV)] · [(1−PPV)/PPV]</div>
+      </div>
+
+      <div class="calc" data-calc="om1">
+        <div class="calc-name">ω₁ <span class="sym">waning R→Sₚ</span></div>
+        <p class="calc-derive">Mean years between successive episodes in repeat patients, or between local surges.</p>
+        <div class="calc-inputs">
+          <label>Years between surges <input type="number" data-k="y" value="4" min="0.5" step="0.5"></label>
+        </div>
+        <div class="calc-out">ω₁ ≈ <b data-out>—</b> <span class="hint" data-hint></span></div>
+        <div class="calc-formula">ω₁ = mean inter‑episode interval (y)</div>
+      </div>
+
+      <div class="calc" data-calc="om2">
+        <div class="calc-name">ω₂ <span class="sym">waning Rₚ→S</span></div>
+        <p class="calc-derive">Assumed total years of immunity minus the ω₁ phase.</p>
+        <div class="calc-inputs">
+          <label>Total immunity (y) <input type="number" data-k="T" value="20" min="1" step="1"></label>
+          <label>ω₁ (y) <input type="number" data-k="w1" value="4" min="0" step="0.5"></label>
+        </div>
+        <div class="calc-out">ω₂ ≈ <b data-out>—</b> <span class="hint" data-hint></span></div>
+        <div class="calc-formula">ω₂ = T − ω₁</div>
+      </div>
+
+      <div class="calc" data-calc="om3">
+        <div class="calc-name">ω₃ <span class="sym">vaccine waning Sₚ→S</span></div>
+        <p class="calc-derive">Years for vaccine effectiveness to fall to half its initial value.</p>
+        <div class="calc-inputs">
+          <label>Initial VE (0–1) <input type="number" data-k="ve0" value="0.80" min="0" max="1" step="0.01"></label>
+          <label>Later VE (0–1) <input type="number" data-k="vet" value="0.50" min="0" max="1" step="0.01"></label>
+          <label>Years elapsed <input type="number" data-k="t" value="5" min="0.5" step="0.5"></label>
+        </div>
+        <div class="calc-out">ω₃ ≈ <b data-out>—</b> <span class="hint" data-hint></span></div>
+        <div class="calc-formula">t½ = t · ln2 / ln(VE₀/VEₜ)</div>
+      </div>
+    </div>
+
+    <h3 class="calc-sub">Seasonality</h3>
+    <div class="calc-grid">
+      <div class="calc" data-calc="peak">
+        <div class="calc-name">Seasonality peak day</div>
+        <p class="calc-derive">Peak month of monthly case counts → mid‑month day of year.</p>
+        <div class="calc-inputs">
+          <label>Peak month (1–12) <input type="number" data-k="mon" value="9" min="1" max="12" step="1"></label>
+        </div>
+        <div class="calc-out">Day of year ≈ <b data-out>—</b> <span class="hint" data-hint></span></div>
+        <div class="calc-formula">day = (month − 1) × 30 + 15</div>
+      </div>
+
+      <div class="calc" data-calc="amp">
+        <div class="calc-name">Seasonality amplitude</div>
+        <p class="calc-derive">Peak‑to‑trough spread of monthly counts relative to the mean.</p>
+        <div class="calc-inputs">
+          <label>Peak‑month cases <input type="number" data-k="peak" value="30" min="0" step="1"></label>
+          <label>Trough‑month cases <input type="number" data-k="trough" value="6" min="0" step="1"></label>
+          <label>Mean monthly cases <input type="number" data-k="mean" value="12" min="0" step="1"></label>
+        </div>
+        <div class="calc-out">Suggested → <b data-out>—</b> <span class="hint" data-hint></span></div>
+        <div class="calc-formula">ratio = (peak − trough) / mean</div>
+      </div>
+    </div>
+
+    <h3 class="calc-sub">From observed case counts</h3>
+    <div class="calc-grid">
+      <div class="calc" data-calc="vax">
+        <div class="calc-name">Vaccinated share <span class="sym">→ Sₚ seed &amp; target</span></div>
+        <p class="calc-derive">Vaccinated (partial) share of cases — the primary calibration target; also informs the Sₚ seed.</p>
+        <div class="calc-inputs">
+          <label>Cases up‑to‑date (Yes) <input type="number" data-k="yes" value="311" min="0" step="1"></label>
+          <label>Cases not up‑to‑date (No) <input type="number" data-k="no" value="160" min="0" step="1"></label>
+        </div>
+        <div class="calc-out">Vaccinated share ≈ <b data-out>—</b> <span class="hint" data-hint></span></div>
+        <div class="calc-formula">Yes / (Yes + No)</div>
+      </div>
+
+      <div class="calc" data-calc="ihr">
+        <div class="calc-name">Hospitalization ratio <span class="sym">IHR, per band</span></div>
+        <p class="calc-derive">Hospitalized cases ÷ total cases within one age band.</p>
+        <div class="calc-inputs">
+          <label>Hospitalized (band) <input type="number" data-k="hosp" value="30" min="0" step="1"></label>
+          <label>Total cases (band) <input type="number" data-k="cases" value="100" min="0" step="1"></label>
+        </div>
+        <div class="calc-out">IHR ≈ <b data-out>—</b> <span class="hint" data-hint></span></div>
+        <div class="calc-formula">IHR = hospitalized / cases</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">02</span><h2 class="sec-title">Initial conditions</h2></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Field</th><th>Default</th><th>Basis</th><th>Rationale</th></tr></thead>
+      <tbody>
+        <tr><td class="param">Initial infected %</td><td class="val">0.1 %</td><td class="basis"><span class="chip assume">Assumption</span></td><td class="src">Small outbreak seed</td></tr>
+        <tr><td class="param">Background immunity %</td><td class="val">85 %</td><td class="basis"><span class="chip litinf">Lit‑informed</span></td><td class="src">High‑vaccination endemic setting; consistent with US DTaP/Tdap coverage [6]</td></tr>
+        <tr><td class="param">Partial‑infection share of seed</td><td class="val">33 %</td><td class="basis"><span class="chip assume">Assumption</span></td><td class="src">Split of seeded cases into the partial track — calibrate</td></tr>
+        <tr><td class="param">Sₚ share of immune pool</td><td class="val">71 %</td><td class="basis"><span class="chip data">Data‑derived</span></td><td class="src">Chosen so the ~66 % vaccinated case share is reproduced from the Lane County line‑list [5]; remainder split Rₚ:R ≈ 0.24:0.05 [1]</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">03</span><h2 class="sec-title">Bayesian calibration (ABC‑SMC) — prior bounds</h2></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Parameter</th><th>Uniform prior</th><th>Basis</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td class="param">R₀</td><td class="val">6 – 18</td><td class="basis"><span class="chip litinf">Lit‑informed</span></td><td class="src">Brackets classic 12–17 [6]</td></tr>
+        <tr><td class="param">σ (rel. infectiousness)</td><td class="val">0.05 – 0.40</td><td class="basis"><span class="chip litinf">Lit‑informed</span></td><td class="src">Brackets secondary‑attack range [1]</td></tr>
+        <tr><td class="param">δ (rel. susceptibility)</td><td class="val">0.10 – 0.60</td><td class="basis"><span class="chip litinf">Lit‑informed</span></td><td class="src">Brackets 1 − VE [1][6]</td></tr>
+        <tr><td class="param">Sₚ share (%)</td><td class="val">40 – 90</td><td class="basis"><span class="chip assume">Assumption</span></td><td class="src">Analyst‑set span around the endemic default</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">Prior bounds are analyst‑set to <b>bracket</b> the literature, not themselves measurements. Method: ABC‑SMC with adaptive tolerance, Gaussian perturbation kernel, importance weights [4]. Targets: observed age distribution + vaccinated share [5], and optionally the CDC NNDSS weekly case‑curve shape [8].</p>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">04</span><h2 class="sec-title">Hospitalization observation model</h2></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Age band</th><th>Default IHR</th><th>Basis</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr><td class="param">0‑1 (infants &lt;1)</td><td class="val">0.30</td><td class="basis"><span class="chip lit">Literature</span></td><td class="src">~1 in 3 infants &lt;1 hospitalized [6][9]</td></tr>
+        <tr><td class="param">1‑6</td><td class="val">0.03</td><td class="basis"><span class="chip litinf">Lit‑informed</span></td><td class="src">Steep drop after infancy [6]</td></tr>
+        <tr><td class="param">7‑10</td><td class="val">0.01</td><td class="basis"><span class="chip assume">Assumption</span></td><td class="src">—</td></tr>
+        <tr><td class="param">11‑19</td><td class="val">0.01</td><td class="basis"><span class="chip assume">Assumption</span></td><td class="src">—</td></tr>
+        <tr><td class="param">20‑49</td><td class="val">0.01</td><td class="basis"><span class="chip assume">Assumption</span></td><td class="src">—</td></tr>
+        <tr><td class="param">50‑64</td><td class="val">0.02</td><td class="basis"><span class="chip assume">Assumption</span></td><td class="src">—</td></tr>
+        <tr><td class="param">65+</td><td class="val">0.04</td><td class="basis"><span class="chip litinf">Lit‑informed</span></td><td class="src">—</td></tr>
+        <tr><td class="param">Partial (vaccinated) IHR</td><td class="val">0.20 × naive</td><td class="basis"><span class="chip assume">Assumption</span></td><td class="src">Milder vaccinated disease</td></tr>
+        <tr><td class="param">Onset→hospitalization delay</td><td class="val">10 d</td><td class="basis"><span class="chip litinf">Lit‑informed</span></td><td class="src">Pertussis ≈ 1–2 wk</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note warn">Provisional 2023 NNDSS: &lt;6 mo ≈ 21 %, 6–11 mo ≈ 8 % hospitalized [9]. IHRs are user‑editable and <b>should be calibrated to local records.</b></p>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">05</span><h2 class="sec-title">Vaccination defaults (DTaP / Tdap)</h2></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Group</th><th>Coverage</th><th>VE (infection)</th><th>Basis</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr><td class="param">0‑1, 1‑6 (DTaP primary series)</td><td class="val">92 %</td><td class="val">80 %</td><td class="basis"><span class="chip litinf">Lit‑informed</span></td><td class="src">US childhood DTaP coverage &amp; VE [6]</td></tr>
+        <tr><td class="param">7‑10, 11‑19 (Tdap adolescent)</td><td class="val">90 %</td><td class="val">80 %</td><td class="basis"><span class="chip litinf">Lit‑informed</span></td><td class="src">[6]</td></tr>
+        <tr><td class="param">20‑49, 50‑64, 65+ (decennial)</td><td class="val">~7 %</td><td class="val">70 %</td><td class="basis"><span class="chip litinf">Lit‑informed</span> <span class="chip assume">Assumption</span></td><td class="src">Low adult booster uptake [6]</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">Schedule structure (5‑dose DTaP by ~age 6; Tdap at 11–12; decennial adult boosters) follows the CDC immunization schedule [6].</p>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">06</span><h2 class="sec-title">Age structure &amp; contact matrices</h2></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Item</th><th>Value</th><th>Basis</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr><td class="param">Age bands</td><td class="val">7 bands (0‑1…65+)</td><td class="basis"><span class="chip assume">Assumption</span></td><td class="src">Design choice — pertussis/vaccination‑schedule oriented (infant, pre‑school, school‑age, adolescent, adults)</td></tr>
+        <tr><td class="param">Population by age</td><td class="val">single‑year → 7 bands</td><td class="basis"><span class="chip data">Data‑derived</span></td><td class="src">US Census age distributions via epydemix‑data [10]</td></tr>
+        <tr><td class="param">Contact matrices (4 layers)</td><td class="val">single‑year → 7×7</td><td class="basis"><span class="chip lit">Literature</span></td><td class="src">Mistry et al. high‑resolution mixing [3], distributed via epydemix‑data [10]</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">07</span><h2 class="sec-title">Simulation settings</h2></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Setting</th><th>Default</th><th>Basis</th></tr></thead>
+      <tbody>
+        <tr><td class="param">Stochastic replicates (N_SIM)</td><td class="val">25</td><td class="basis"><span class="chip assume">Analyst</span></td></tr>
+        <tr><td class="param">Simulation length</td><td class="val">250 d</td><td class="basis"><span class="chip assume">Assumption</span></td></tr>
+        <tr><td class="param">Time step (Δt)</td><td class="val">0.2 d</td><td class="basis"><span class="chip assume">Analyst</span></td></tr>
+        <tr><td class="param">Start date</td><td class="val">2026‑01‑01</td><td class="basis"><span class="chip assume">Analyst</span></td></tr>
+        <tr><td class="param">Engine</td><td class="val">epydemix stochastic</td><td class="basis"><span class="chip lit">Software [10]</span></td></tr>
+        <tr><td class="param">Model structure</td><td class="val">8‑compartment SEIRS</td><td class="basis"><span class="chip lit">Literature [1]</span></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">08</span><h2 class="sec-title">Observed &amp; calibration data sources</h2></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Dataset</th><th>Use</th><th>Provenance</th></tr></thead>
+      <tbody>
+        <tr><td class="param">Observed case cross‑tab <span class="sym">(age × vax status)</span></td><td class="src">Age‑distribution + vaccinated‑share targets; seeds Sₚ share</td><td class="src">Local surveillance line‑list aggregated to the model's bands [5] — required form in <a href="#appendix-a">Appendix A</a>. Example: Lane County (489 cases), <span class="mono">data/observed/lane_county_pertussis.csv</span></td></tr>
+        <tr><td class="param">CDC NNDSS weekly <span class="sym">(x9gk‑5huc)</span></td><td class="src">Weekly case‑curve shape target; multi‑year seasonality estimate</td><td class="src">CDC NNDSS provisional weekly [8] — <b>undercounts vs finalized annual</b></td></tr>
+        <tr><td class="param">Small‑numbers suppression</td><td class="src">Data‑handling constraint</td><td class="src">OHA Guidelines v2 (2015): denominator ≥ 50 primary rule; program count thresholds (e.g. ≥5) [11]</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">§</span><h2 class="sec-title">References</h2></div>
+    <ol class="refs">
+      <li>Wearing HJ, Rohani P. Estimating the duration of pertussis immunity using epidemiological signatures. <cite>PLoS Pathog.</cite> 2009;5(10):e1000647. <a class="doi" href="https://doi.org/10.1371/journal.ppat.1000647">doi:10.1371/journal.ppat.1000647</a></li>
+      <li>Lavine JS, King AA, Bjørnstad ON. Natural immune boosting in pertussis dynamics and the potential for long‑term vaccine failure. <cite>PNAS.</cite> 2011;108(17):7259–7264. <a class="doi" href="https://doi.org/10.1073/pnas.1014394108">doi:10.1073/pnas.1014394108</a></li>
+      <li>Mistry D, Litvinova M, Pastore y Piontti A, et al. Inferring high‑resolution human mixing patterns for disease modeling. <cite>Nat Commun.</cite> 2021;12:323. <a class="doi" href="https://doi.org/10.1038/s41467-020-20544-y">doi:10.1038/s41467-020-20544-y</a></li>
+      <li>Toni T, Welch D, Strelkowa N, Ipsen A, Stumpf MPH. Approximate Bayesian computation scheme for parameter inference and model selection in dynamical systems. <cite>J R Soc Interface.</cite> 2009;6(31):187–202. <a class="doi" href="https://doi.org/10.1098/rsif.2008.0172">doi:10.1098/rsif.2008.0172</a></li>
+      <li>Observed case cross‑tabulation by age band × vaccination‑up‑to‑date status — a local surveillance line‑list aggregated to the model's age bands. Required form, file format &amp; small‑cell handling: <a href="#appendix-a">see Appendix A</a>. Example instance: Lane County, Oregon (SOAR / International Responder Systems team; 489 cases; not independently published).</li>
+      <li>Havers FP, Moro PL, Hariri S, et al. Pertussis. In: <cite>Epidemiology and Prevention of Vaccine‑Preventable Diseases</cite> (Pink Book). 14th ed. Atlanta, GA: CDC; 2021. Ch. 16.</li>
+      <li>Delamater PL, Street EJ, Leslie TF, Yang YT, Jacobsen KH. Complexity of the Basic Reproduction Number (R₀). <cite>Emerg Infect Dis.</cite> 2019;25(1):1–4. <a class="doi" href="https://doi.org/10.3201/eid2501.171901">doi:10.3201/eid2501.171901</a></li>
+      <li>CDC National Notifiable Diseases Surveillance System (NNDSS) — Weekly Data. <span class="mono">data.cdc.gov</span> dataset x9gk‑5huc (provisional weekly counts).</li>
+      <li>CDC. 2023 Provisional Pertussis Surveillance Report (age‑specific hospitalization percentages). <span class="mono">cdc.gov/pertussis</span>.</li>
+      <li>Gozzi N, Chinazzi M, Davis JT, Gioannini C, Rossi L, Ajelli M, Perra N, Vespignani A. Epydemix: an open‑source Python package for epidemic modeling with integrated approximate Bayesian calibration. <cite>PLoS Comput Biol.</cite> 2025;21(11):e1013735. <a class="doi" href="https://doi.org/10.1371/journal.pcbi.1013735">doi:10.1371/journal.pcbi.1013735</a> · data: epydemix‑data (github.com/epistorm/epydemix‑data).</li>
+      <li>Oregon Public Health Division. Guidelines for Reporting Small Numbers to Protect Confidentiality, Version 2. March 2015.</li>
+    </ol>
+  </section>
+
+  <section class="appendix" id="appendix-a">
+    <div class="sec-head"><span class="sec-num">A</span><h2 class="sec-title">Observed case data — required form &amp; example</h2></div>
+    <p><b>Required form.</b> Calibration and outbreak‑seeding need an observed <b>case cross‑tabulation</b>: confirmed case counts broken down by <b>age</b> and <b>vaccination‑up‑to‑date status</b>. The status maps onto the model's two tracks:</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Status column</th><th>Meaning</th><th>Model track</th></tr></thead>
+      <tbody>
+        <tr><td class="param">No</td><td class="src">not up to date on vaccination</td><td class="src">naive (I / E→I)</td></tr>
+        <tr><td class="param">Yes</td><td class="src">up to date</td><td class="src">partial (Iₚ / Eₚ→Iₚ)</td></tr>
+        <tr><td class="param">Unknown</td><td class="src">status not established</td><td class="src">allocated within band by the known No:Yes ratio</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>File format.</b> A CSV in <span class="mono">data/observed/</span> with an optional metadata header and one row per age label. Any CSV there appears automatically in the app's dataset dropdown.</p>
+    <pre class="codeblock"><span class="cmt"># name: &lt;dataset name shown in the app&gt;
+# geography_hint: &lt;epydemix location, e.g. United_States__Oregon__Lane_County&gt;
+# note: &lt;one-line description&gt;
+# source: &lt;provenance statement&gt;</span>
+age_label,No,Unknown,Yes
+0,16,0,13
+1-6,45,3,44
+50+,9,1,8</pre>
+    <p><span class="mono">age_label</span> accepts single years, <span class="mono">lo-hi</span> bands, or an open <span class="mono">50+</span>; all are auto‑aggregated to the model's seven bands.</p>
+    <p><b>How it's used.</b> It supplies two <em>scale‑free</em> calibration targets — the case <b>age distribution</b> and the <b>vaccinated (partial) share</b> = Yes ÷ (Yes + No) — and seeds the Sₚ share of the immune pool. It is <b>not</b> a time series; the weekly epidemic‑curve target is drawn separately from CDC NNDSS [8].</p>
+    <p class="note warn"><b>Small‑cell suppression.</b> Health departments commonly suppress cells with counts below a threshold (often &lt; 5) and require a denominator ≥ 50 (OHA rule [11]). Request the data <b>pre‑aggregated to the model's seven bands × {up‑to‑date, not}</b> so band totals clear both thresholds by construction; where a cell is still suppressed, treat it as the interval <b>[1, 4]</b>, never 0.</p>
+    <p><b>Example instance — Lane County, Oregon.</b> The bundled dataset (<span class="mono">data/observed/lane_county_pertussis.csv</span>) is a Lane County pertussis line‑list provided by the SOAR/IRS team: <b>489 cases (160 No / 18 Unknown / 311 Yes)</b>, an overall <b>~66 % vaccinated share</b>. Its single‑year rows start at age 1 and fold 65+ into “50+”, so the model's 0‑1 and 65+ bands show zero observed cases for this source.</p>
+    <p class="note"><b>Caveat.</b> The vaccinated share of <em>cases</em> is not population vaccination <em>coverage</em> — in a highly vaccinated population many cases are breakthroughs. Use it as a structural calibration target, not a coverage estimate; substitute registry coverage (e.g. Oregon ALERT IIS) where a true denominator is available.</p>
+  </section>
+
+  <footer>
+    Generated as a companion to the EpyScenario Pertussis System Description. Values reflect the code at time of writing (<span class="mono">constants.py</span>, <span class="mono">schemas.py</span>, <span class="mono">engine/calibration.py</span>, <span class="mono">engine/hospitalization.py</span>, <span class="mono">pages/Vaccination_Planner.py</span>, <span class="mono">data/</span>). Re‑verify against the source files after parameter changes.
+  </footer>
+</div>
+
+<script>
+(function () {
+  var ln = Math.log, clamp01 = function (x) { return Math.max(0, Math.min(1, x)); };
+  var FN = {
+    r0: function (x) {
+      if (!(x.c1 > 0 && x.c2 > 0 && x.dt > 0)) return { bad: "need positive counts" };
+      var r = ln(x.c2 / x.c1) / x.dt, R = 1 + r * x.D;
+      return { text: R.toFixed(1), sub: "r=" + r.toFixed(3) + "/day" };
+    },
+    incub: function (x) { return { text: x.samples.toFixed(1) + " d" }; },
+    infN: function (x) { var v = Math.min(21, x.m + 5); return { text: v.toFixed(1) + " d", sub: x.m + 5 > 21 ? "capped at 21" : "" }; },
+    infP: function (x) { var v = Math.min(21, x.m + 5); return { text: v.toFixed(1) + " d", sub: x.m + 5 > 21 ? "capped at 21" : "" }; },
+    sigma: function (x) {
+      if (!(x.su > 0)) return { bad: "need SAR(unvax) > 0" };
+      var s = x.sv / x.su; return { text: clamp01(s).toFixed(2), sub: s > 1 ? "ratio>1 clamped" : "" };
+    },
+    delta: function (x) {
+      var pcv = x.pcv / 100, ppv = x.ppv / 100;
+      if (!(pcv > 0 && pcv < 1 && ppv > 0 && ppv < 1)) return { bad: "0 < PCV, PPV < 100" };
+      var or = (pcv / (1 - pcv)) * ((1 - ppv) / ppv), d = clamp01(or);
+      return { text: d.toFixed(2), sub: "VE=" + (1 - d).toFixed(2) };
+    },
+    om1: function (x) { return { text: x.y.toFixed(1) + " y" }; },
+    om2: function (x) { var v = x.T - x.w1; return { text: v.toFixed(1) + " y", sub: v <= 0 ? "total must exceed ω₁" : "" }; },
+    om3: function (x) {
+      if (!(x.ve0 > x.vet && x.vet > 0 && x.t > 0)) return { bad: "need VE₀ > VEₜ > 0" };
+      var th = x.t * ln(2) / ln(x.ve0 / x.vet); return { text: th.toFixed(1) + " y", sub: "VE half-life" };
+    },
+    peak: function (x) {
+      if (!(x.mon >= 1 && x.mon <= 12)) return { bad: "month 1–12" };
+      return { text: String(Math.round((x.mon - 1) * 30 + 15)) };
+    },
+    amp: function (x) {
+      if (!(x.mean > 0)) return { bad: "mean > 0" };
+      var rr = (x.peak - x.trough) / x.mean;
+      var cat = rr < 0.5 ? "Low" : rr < 1.0 ? "Medium" : rr < 1.5 ? "Moderate" : "Strong";
+      return { text: cat, sub: "ratio=" + rr.toFixed(2) };
+    },
+    vax: function (x) { var d = x.yes + x.no; if (!(d > 0)) return { bad: "need Yes+No > 0" }; return { text: (100 * x.yes / d).toFixed(1) + "%", sub: "Yes/(Yes+No)" }; },
+    ihr: function (x) { if (!(x.cases > 0)) return { bad: "cases > 0" }; return { text: (x.hosp / x.cases).toFixed(3), sub: (100 * x.hosp / x.cases).toFixed(1) + "%" }; }
+  };
+  function readVal(inp) {
+    if (inp.dataset.list !== undefined) {
+      var nums = inp.value.split(/[,\s]+/).map(parseFloat).filter(function (v) { return !isNaN(v); });
+      return nums.length ? nums.reduce(function (a, b) { return a + b; }, 0) / nums.length : null;
+    }
+    var v = parseFloat(inp.value); return isNaN(v) ? null : v;
+  }
+  document.querySelectorAll(".calc").forEach(function (card) {
+    var f = FN[card.dataset.calc];
+    var inputs = Array.prototype.slice.call(card.querySelectorAll("input[data-k]"));
+    var out = card.querySelector("[data-out]"), hint = card.querySelector("[data-hint]");
+    function run() {
+      var x = {}, miss = false;
+      inputs.forEach(function (i) { var v = readVal(i); if (v === null) miss = true; x[i.dataset.k] = v; });
+      var r = null;
+      if (!miss && f) { try { r = f(x); } catch (e) { r = null; } }
+      if (!r) { out.textContent = "—"; if (hint) hint.textContent = ""; return; }
+      if (r.bad) { out.textContent = "—"; if (hint) hint.textContent = r.bad; return; }
+      out.textContent = r.text; if (hint) hint.textContent = r.sub || "";
+    }
+    inputs.forEach(function (i) { i.addEventListener("input", run); });
+    run();
+  });
+})();
+</script>
+
+</body>
+</html>

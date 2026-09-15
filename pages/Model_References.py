@@ -1,14 +1,15 @@
 # pages/Model_References.py
 #
-# In-app parameter & data provenance reference: native "derive from your data"
-# calculators (the same tactical formulas as the app tooltips), plus the full
-# provenance document rendered from docs/parameter-references.md (source of
-# truth, kept in git), and a link to the shareable interactive artifact.
+# Parameter & data provenance: rather than rebuild the reference as Streamlit
+# widgets, embed the self-contained HTML page we generated (evidence-tier tables,
+# full sourced reference, and the interactive data -> parameter calculators) via
+# st.components.v1.html so its own CSS/JS run. A link to the shareable claude.ai
+# artifact (the same page) is offered for hand-off.
 
-import math
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from layout.header import show_dashboard_header
 from layout.sidebar import render_sidebar
@@ -22,13 +23,7 @@ st.set_page_config(
 )
 
 st.markdown(
-    """
-    <style>
-        .block-container { padding-top: 2rem; padding-bottom: 5rem; }
-        .ref-doc table { font-size: 0.9rem; }
-        .ref-doc { max-width: 1000px; }
-    </style>
-    """,
+    "<style>.block-container{padding-top:2rem;padding-bottom:5rem;}</style>",
     unsafe_allow_html=True,
 )
 
@@ -39,259 +34,24 @@ st.markdown("## Model References & Provenance")
 st.caption(
     "Where every default value, plausible range, prior bound, and data input in the "
     "pertussis model comes from — each tagged by evidence tier (Literature · "
-    "Lit-informed · Assumption · Data-derived)."
+    "Lit-informed · Assumption · Data-derived) — plus a calculator for each parameter "
+    "that converts local surveillance data into a value."
 )
 
-
-# ---------------------------------------------------------------------------
-# Calculators — derive a parameter value from locally-monitored data
-# ---------------------------------------------------------------------------
-def _metric(col, label, value, formula, sub=""):
-    with col:
-        col.metric(label, value, help=formula)
-        if sub:
-            col.caption(sub)
-
-
-def render_calculators():
-    st.markdown("### Derive parameters from your data")
-    st.caption(
-        "Plug in locally-monitored quantities — each result updates live. These are the "
-        "same tactical formulas carried in the app's parameter tooltips. Fields are "
-        "pre-filled with **example values**; replace them with your own. For "
-        "transmissibility and immunity, a full ABC-SMC calibration is preferred over any "
-        "single point estimate."
-    )
-
-    # ---- Transmission & clinical course ----
-    st.markdown("**Transmission & clinical course**")
-    r = st.columns(3)
-    with r[0].container(border=True):
-        st.markdown("**R₀** · early case growth")
-        c1 = st.number_input(
-            "Early weekly cases C₁", 0.0, value=10.0, step=1.0, key="r0_c1",
-            help="New cases in an early week of the outbreak, while spread is still "
-                 "accelerating. How to find: pick the first MMWR week that clearly rises "
-                 "above baseline and take that week's confirmed + probable case count.")
-        c2 = st.number_input(
-            "Later weekly cases C₂", 0.0, value=22.0, step=1.0, key="r0_c2",
-            help="New cases in a later week that is still on the upslope (before the peak). "
-                 "How to find: a week 1–3 weeks after C₁; avoid any week at or past the peak, "
-                 "which breaks the exponential-growth assumption.")
-        dt = st.number_input(
-            "Days between", 1.0, value=7.0, step=1.0, key="r0_dt",
-            help="Calendar days between the C₁ and C₂ observations. How to find: end-of-week "
-                 "to end-of-week — 7 for consecutive MMWR weeks, 14 if you skipped one.")
-        D = st.number_input(
-            "Generation interval (d)", 1.0, value=30.0, step=1.0, key="r0_D",
-            help="Average time from one person's infection to when they infect the next — "
-                 "sets how fast growth converts to R₀. For pertussis ≈ 30 days. How to find: "
-                 "incubation period + infectious period, or a published serial-interval estimate.")
-        if c1 > 0 and c2 > 0 and dt > 0:
-            gr = math.log(c2 / c1) / dt
-            st.metric("R₀ ≈", f"{1 + gr * D:.1f}", help="r = ln(C₂/C₁)/Δt · R₀ = 1 + r·D")
-            st.caption(f"growth r = {gr:.3f}/day")
-        else:
-            st.metric("R₀ ≈", "—")
-    with r[1].container(border=True):
-        st.markdown("**Incubation** · 1/ε")
-        s = st.text_input(
-            "Onset−exposure intervals (d), comma-sep", "8, 9, 11, 7", key="inc_s",
-            help="For each traced case, the days from exposure to first symptoms (cough onset) "
-                 "— the latent period. Enter several, comma-separated; they are averaged. "
-                 "How to find: from contact tracing, (cough-onset date − known exposure date) "
-                 "for cases with a single identifiable exposure.")
-        vals = [float(x) for x in s.replace(",", " ").split() if x.replace(".", "", 1).isdigit()]
-        st.metric("Incubation ≈", f"{sum(vals)/len(vals):.1f} d" if vals else "—",
-                  help="mean of the listed intervals")
-    with r[2].container(border=True):
-        st.markdown("**Infectious — naive** · 1/γ")
-        m = st.number_input(
-            "Median onset→treatment (d)", 0.0, value=16.0, step=1.0, key="infN_m",
-            help="Typical days from cough onset to starting effective antibiotics (which ends "
-                 "infectiousness). How to find: median of (treatment-start date − cough-onset "
-                 "date) across cases. Untreated cases stay infectious ~21 days — hence the cap.")
-        st.metric("Infectious ≈", f"{min(21.0, m + 5):.1f} d", help="min(21, m + 5)")
-    r = st.columns(3)
-    with r[0].container(border=True):
-        st.markdown("**Infectious — partial** · 1/γₚ")
-        m = st.number_input(
-            "Median onset→treatment (d), vaccinated", 0.0, value=7.0, step=1.0, key="infP_m",
-            help="The same onset→treatment interval, but computed only over up-to-date "
-                 "(vaccinated) cases, whose illness is usually milder and shorter. How to find: "
-                 "filter the line list to 'up to date' status, then take the median.")
-        st.metric("Infectious ≈", f"{min(21.0, m + 5):.1f} d", help="min(21, m + 5)")
-    with r[1].container(border=True):
-        st.markdown("**σ** · rel. infectiousness of Iₚ")
-        sv = st.number_input(
-            "SAR, vaccinated index", 0.0, value=0.05, step=0.01, key="sig_sv",
-            help="Secondary attack rate — the fraction of close contacts who become cases — "
-                 "when the source (index) case was vaccinated. How to find: from contact "
-                 "investigations, secondary cases ÷ total contacts of vaccinated index cases "
-                 "(typically 0.05–0.15).")
-        su = st.number_input(
-            "SAR, unvaccinated index", 0.0, value=0.25, step=0.01, key="sig_su",
-            help="The same secondary attack rate for unvaccinated index cases — the baseline "
-                 "(usually higher, ~0.2–0.4). How to find: secondary cases ÷ total contacts of "
-                 "unvaccinated index cases.")
-        st.metric("σ ≈", f"{max(0.0, min(1.0, sv/su)):.2f}" if su > 0 else "—",
-                  help="σ = SAR(vax) / SAR(unvax)")
-    r[2].empty()
-
-    # ---- Immunity & waning ----
-    st.markdown("**Immunity & waning**")
-    r = st.columns(3)
-    with r[0].container(border=True):
-        st.markdown("**δ** · rel. susceptibility of Sₚ")
-        pcv = st.number_input(
-            "% of cases vaccinated (PCV)", 0.0, 100.0, 66.0, 1.0, key="del_pcv",
-            help="Of your confirmed cases with known status, the percent who were up-to-date "
-                 "on vaccination. How to find: Yes ÷ (Yes + No) from the age×vaccination "
-                 "cross-tab, ×100 (exclude Unknown).")
-        ppv = st.number_input(
-            "Population coverage % (PPV)", 0.0, 100.0, 90.0, 1.0, key="del_ppv",
-            help="The percent of the general population that is up-to-date — the denominator, "
-                 "NOT the case data. How to find: the immunization registry (e.g. Oregon ALERT "
-                 "IIS) for the same age groups and area.")
-        p, q = pcv / 100.0, ppv / 100.0
-        if 0 < p < 1 and 0 < q < 1:
-            d = max(0.0, min(1.0, (p / (1 - p)) * ((1 - q) / q)))
-            st.metric("δ ≈", f"{d:.2f}", help="δ = [PCV/(1−PCV)]·[(1−PPV)/PPV] = 1 − VE")
-            st.caption(f"VE = {1 - d:.2f}")
-        else:
-            st.metric("δ ≈", "—")
-    with r[1].container(border=True):
-        st.markdown("**ω₁** · waning R→Sₚ")
-        y = st.number_input(
-            "Years between surges", 0.5, value=4.0, step=0.5, key="om1_y",
-            help="How long strong post-infection immunity lasts before it wanes to partial. "
-                 "How to find: the typical gap in years between local outbreak years, or the "
-                 "mean interval between repeat episodes in patients who have had more than one.")
-        st.metric("ω₁ ≈", f"{y:.1f} y", help="ω₁ = mean inter-episode interval")
-    with r[2].container(border=True):
-        st.markdown("**ω₂** · waning Rₚ→S")
-        T = st.number_input(
-            "Total immunity (y)", 1.0, value=20.0, step=1.0, key="om2_T",
-            help="Assumed total years of protection after infection before a person is fully "
-                 "susceptible again. How to find: long-term reinfection / serology studies — "
-                 "pertussis estimates run ~15–20 years.")
-        w1 = st.number_input(
-            "ω₁ (y)", 0.0, value=4.0, step=0.5, key="om2_w1",
-            help="The full→partial waning time (the ω₁ result). How to find: reuse the ω₁ "
-                 "value from the calculator to its left; ω₂ is the time remaining after that phase.")
-        st.metric("ω₂ ≈", f"{T - w1:.1f} y", help="ω₂ = T − ω₁")
-        if T - w1 <= 0:
-            st.caption("total must exceed ω₁")
-    r = st.columns(3)
-    with r[0].container(border=True):
-        st.markdown("**ω₃** · vaccine waning Sₚ→S")
-        ve0 = st.number_input(
-            "Initial VE (0–1)", 0.0, 1.0, 0.80, 0.01, key="om3_ve0",
-            help="Vaccine effectiveness against infection just after the primary series / "
-                 "booster, as a fraction (0.80 = 80%). How to find: VE among cases 0–1 years "
-                 "since last dose, from a screening-method or cohort study.")
-        vet = st.number_input(
-            "Later VE (0–1)", 0.0, 1.0, 0.50, 0.01, key="om3_vet",
-            help="Vaccine effectiveness several years later, showing the decline. How to find: "
-                 "stratify cases by years-since-last-dose and compute screening-method VE in the "
-                 "later stratum.")
-        t = st.number_input(
-            "Years elapsed", 0.5, value=5.0, step=0.5, key="om3_t",
-            help="Years between the initial and later VE measurements. How to find: the gap "
-                 "between the two dose-timing strata you compared (e.g. 0–1 y vs 5–6 y → ~5).")
-        if ve0 > vet > 0 and t > 0:
-            st.metric("ω₃ ≈", f"{t * math.log(2) / math.log(ve0 / vet):.1f} y",
-                      help="t½ = t · ln2 / ln(VE₀/VEₜ)")
-        else:
-            st.metric("ω₃ ≈", "—", help="need VE₀ > VEₜ > 0")
-    r[1].empty(); r[2].empty()
-
-    # ---- Seasonality ----
-    st.markdown("**Seasonality**")
-    r = st.columns(3)
-    with r[0].container(border=True):
-        st.markdown("**Seasonality peak day**")
-        mon = st.number_input(
-            "Peak month (1–12)", 1, 12, 9, 1, key="pk_mon",
-            help="The calendar month when local cases usually peak (1 = Jan … 12 = Dec); "
-                 "pertussis often peaks late summer / early autumn. How to find: the month with "
-                 "the highest average case count across several years of local surveillance.")
-        st.metric("Day of year ≈", f"{int((mon - 1) * 30 + 15)}", help="day = (month − 1) × 30 + 15")
-    with r[1].container(border=True):
-        st.markdown("**Seasonality amplitude**")
-        pk = st.number_input(
-            "Peak-month cases", 0.0, value=30.0, step=1.0, key="amp_pk",
-            help="Average case count in the busiest month. How to find: mean cases for that "
-                 "month across the years you have.")
-        tr = st.number_input(
-            "Trough-month cases", 0.0, value=6.0, step=1.0, key="amp_tr",
-            help="Average case count in the quietest month. How to find: mean cases for the "
-                 "lowest month across the years you have.")
-        mn = st.number_input(
-            "Mean monthly cases", 0.0, value=12.0, step=1.0, key="amp_mn",
-            help="Average cases per month overall. How to find: annual total ÷ 12, averaged "
-                 "over the available years.")
-        if mn > 0:
-            ratio = (pk - tr) / mn
-            cat = "Low" if ratio < 0.5 else "Medium" if ratio < 1.0 else "Moderate" if ratio < 1.5 else "Strong"
-            st.metric("Suggested →", cat, help="ratio = (peak − trough)/mean")
-            st.caption(f"ratio = {ratio:.2f}")
-        else:
-            st.metric("Suggested →", "—")
-    r[2].empty()
-
-    # ---- From observed case counts ----
-    st.markdown("**From observed case counts**")
-    r = st.columns(3)
-    with r[0].container(border=True):
-        st.markdown("**Vaccinated share** · → Sₚ seed & target")
-        yes = st.number_input(
-            "Cases up-to-date (Yes)", 0.0, value=311.0, step=1.0, key="vax_yes",
-            help="Number of confirmed cases recorded as up-to-date on pertussis vaccination. "
-                 "How to find: the 'Yes' column total of your age×vaccination cross-tab.")
-        no = st.number_input(
-            "Cases not up-to-date (No)", 0.0, value=160.0, step=1.0, key="vax_no",
-            help="Number of confirmed cases recorded as NOT up-to-date. How to find: the 'No' "
-                 "column total; exclude 'Unknown' from both.")
-        st.metric("Vaccinated share ≈", f"{100*yes/(yes+no):.1f}%" if (yes + no) > 0 else "—",
-                  help="Yes / (Yes + No)")
-    with r[1].container(border=True):
-        st.markdown("**Hospitalization ratio** · IHR, per band")
-        hosp = st.number_input(
-            "Hospitalized (band)", 0.0, value=30.0, step=1.0, key="ihr_h",
-            help="Number of cases hospitalized within one age band. How to find: count "
-                 "admissions among confirmed cases in that band over your reporting period.")
-        cases = st.number_input(
-            "Total cases (band)", 0.0, value=100.0, step=1.0, key="ihr_c",
-            help="Total confirmed cases in the same age band — the denominator. How to find: "
-                 "all confirmed cases in that band over the same period.")
-        st.metric("IHR ≈", f"{hosp/cases:.3f}" if cases > 0 else "—", help="IHR = hospitalized / cases")
-    r[2].empty()
-
-
-render_calculators()
-
-st.divider()
-
-# ---------------------------------------------------------------------------
-# Full provenance document + link to the shareable interactive version
-# ---------------------------------------------------------------------------
-st.markdown("### Full provenance reference")
 ARTIFACT_URL = "https://claude.ai/code/artifact/e82c6144-6f92-4aa8-ae4f-8ab3bbc5f6b2"
-st.link_button("🧬 Open the shareable version (same calculators + tables)",
-               ARTIFACT_URL, use_container_width=False)
-st.caption("The shareable page is a private artifact — use its Share menu to grant your team access.")
+st.markdown(
+    f'<a href="{ARTIFACT_URL}" target="_blank" rel="noopener" '
+    'style="color:#4cc9c6;font-weight:600;text-decoration:none;">'
+    '🧬 Open the shareable version in a new tab ↗</a> '
+    '<span style="color:#8a97a0;font-size:0.85rem;">— private artifact; use its Share menu for your team.</span>',
+    unsafe_allow_html=True,
+)
 
-_DOC = Path(__file__).resolve().parent.parent / "docs" / "parameter-references.md"
+# Embed the generated HTML so its calculators and styling run in-app.
+_HTML = Path(__file__).resolve().parent.parent / "static" / "parameter-references.html"
 try:
-    text = _DOC.read_text(encoding="utf-8")
-    lines = text.splitlines()
-    if lines and lines[0].startswith("# "):
-        lines = lines[1:]
-    st.markdown('<div class="ref-doc">', unsafe_allow_html=True)
-    st.markdown("\n".join(lines))
-    st.markdown("</div>", unsafe_allow_html=True)
+    components.html(_HTML.read_text(encoding="utf-8"), height=1500, scrolling=True)
 except FileNotFoundError:
-    st.error(f"Provenance document not found at {_DOC}. Expected docs/parameter-references.md.")
+    st.error(f"Provenance HTML not found at {_HTML}.")
 
 show_logos()
