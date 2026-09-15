@@ -17,7 +17,7 @@
   body { margin:0; background:var(--ground); color:var(--ink);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased; }
-  .wrap { max-width:1180px; margin:0 auto; padding:clamp(1.25rem,3vw,2.5rem); }
+  .wrap { width:80%; max-width:none; margin:0 auto; padding:clamp(1.25rem,3vw,2.5rem) 0; }
   header { border-bottom:2px solid var(--ink); padding-bottom:1rem; margin-bottom:1.5rem; }
   .eyebrow { font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace; font-size:.72rem;
     letter-spacing:.16em; text-transform:uppercase; color:var(--accent); margin:0 0 .5rem; }
@@ -26,21 +26,22 @@
   .lede { color:var(--soft); margin:.2rem 0 0; max-width:75ch; }
   .meta { margin-top:.8rem; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.74rem; color:var(--faint); }
   .scroll { overflow-x:auto; border:1px solid var(--line); border-radius:10px; background:var(--surface); }
-  table { width:100%; border-collapse:collapse; font-size:.85rem; min-width:1000px; }
+  table { width:100%; border-collapse:collapse; font-size:.82rem; table-layout:auto; }
   thead th { position:sticky; top:0; background:var(--surface2); color:var(--faint);
-    font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.68rem; letter-spacing:.05em; text-transform:uppercase;
-    text-align:left; padding:.7rem .8rem; border-bottom:2px solid var(--lineb); white-space:nowrap; }
-  tbody td { padding:.7rem .8rem; border-bottom:1px solid var(--line); vertical-align:top; }
+    font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.66rem; letter-spacing:.05em; text-transform:uppercase;
+    text-align:left; padding:.35rem .6rem; border-bottom:2px solid var(--lineb); white-space:nowrap; }
+  tbody td { padding:.3rem .6rem; border-bottom:1px solid var(--line); vertical-align:top; line-height:1.3; }
   tbody tr:nth-child(even) { background:rgba(120,140,150,.08); }
-  .pname { font-weight:700; min-width:12ch; }
+  .pname { font-weight:700; min-width:11ch; }
   .sym { font-family:ui-monospace,Menlo,Consolas,monospace; color:var(--accent2); white-space:nowrap; }
-  .units { color:var(--soft); white-space:nowrap; font-size:.8rem; }
-  .desc { color:var(--soft); min-width:24ch; max-width:34ch; }
-  .num { font-family:ui-monospace,Menlo,Consolas,monospace; font-variant-numeric:tabular-nums; white-space:nowrap; }
-  .rat { min-width:30ch; max-width:44ch; }
-  .cite { min-width:24ch; max-width:34ch; }
-  .cite ul { margin:0; padding-left:1.1em; }
-  .cite li { font-size:.76rem; color:var(--faint); margin-bottom:.35rem; line-height:1.4; }
+  .units { color:var(--soft); white-space:nowrap; font-size:.78rem; }
+  .desc { color:var(--soft); }
+  .num { font-family:ui-monospace,Menlo,Consolas,monospace; font-variant-numeric:tabular-nums; white-space:nowrap;
+    line-height:1.25; width:1%; }
+  .rat {}
+  .cite { }
+  .cite ul { margin:0; padding-left:1.05em; }
+  .cite li { font-size:.72rem; color:var(--faint); margin-bottom:.15rem; line-height:1.25; }
   footer { margin-top:1.5rem; padding-top:1rem; border-top:1px solid var(--line); font-size:.8rem; color:var(--faint); }
   code { font-family:ui-monospace,Menlo,Consolas,monospace; background:var(--surface2); padding:.05em .35em; border-radius:4px; }
 </style>
@@ -67,7 +68,7 @@
 <tr><td class="pname">Waning — partial → susceptible</td><td class="sym">ω₂</td><td class="units">years</td><td class="desc">Years over which Rₚ loses remaining partial immunity and returns to S. Slower than ω₁ — partial immunity persists longer.</td><td class="num">12</td><td class="num">1&nbsp;–&nbsp;50</td><td class="rat">The residual, non-sterilizing phase outlasts ω₁ (Wendelboe 2005: natural-infection immunity extends toward ~20 y). 12 years keeps the ordering ω₂ &gt; ω₁ and sits within the reviewed range.</td><td class="cite"><ul><li>Wendelboe AM, Van Rie A, Salmaso S, Englund JA. Duration of immunity against pertussis after natural infection or vaccination. Pediatr Infect Dis J. 2005;24(5 Suppl):S58–S61.</li></ul></td></tr>
 <tr><td class="pname">Waning — vaccine (Sₚ → S)</td><td class="sym">ω₃</td><td class="units">years</td><td class="desc">Years over which vaccine-derived partial protection (Sₚ) is lost, returning individuals to full susceptibility (S) — the acellular-vaccine waning behind adolescent resurgence.</td><td class="num">7</td><td class="num">2&nbsp;–&nbsp;12</td><td class="rat">Klein (2012, NEJM) found the odds of pertussis rose ~42% per year after the fifth DTaP dose — rapid waning of acellular protection over roughly five years, the rationale for the Tdap booster at 11–12 y. 7 years is a central estimate spanning rapid (~5 y) and more durable (~10 y) responses.</td><td class="cite"><ul><li>Klein NP, Bartlett J, Rowhani-Rahbar A, Fireman B, Baxter R. Waning protection after fifth dose of acellular pertussis vaccine in children. N Engl J Med. 2012;367(11):1012–1019.</li></ul></td></tr>
 <tr><td class="pname">Seasonality peak day</td><td class="sym">—</td><td class="units">day of year</td><td class="desc">Day of the year (1–365) at which the seasonal transmission multiplier peaks. Pertussis often peaks in late summer / early autumn.</td><td class="num">240</td><td class="num">1&nbsp;–&nbsp;365</td><td class="rat">Fine &amp; Clarkson (1986) documented summer–autumn pertussis seasonality, and US surveillance (CDC NNDSS) shows late-summer/early-autumn peaks; day 240 (late August) is a central value, best refined from local multi-year data.</td><td class="cite"><ul><li>Fine PEM, Clarkson JA. Seasonal influences on pertussis. Int J Epidemiol. 1986;15(2):237–247.</li><li>CDC National Notifiable Diseases Surveillance System (NNDSS) — Weekly Data. data.cdc.gov dataset x9gk-5huc.</li></ul></td></tr>
-<tr><td class="pname">Seasonality amplitude</td><td class="sym">—</td><td class="units">category</td><td class="desc">Strength of the seasonal forcing on transmission (peak-to-trough), from None to Strong.</td><td class="num">Low</td><td class="num">Strong · Moderate · Medium · Weak · Low · None</td><td class="rat">Pertussis seasonal forcing is weak relative to strongly seasonal childhood infections (Wearing &amp; Rohani 2009; Fine &amp; Clarkson 1986); &#x27;Low&#x27; (~10% peak-to-trough) is typical.</td><td class="cite"><ul><li>Wearing HJ, Rohani P. Estimating the duration of pertussis immunity using epidemiological signatures. PLoS Pathog. 2009;5(10):e1000647.</li><li>Fine PEM, Clarkson JA. Seasonal influences on pertussis. Int J Epidemiol. 1986;15(2):237–247.</li></ul></td></tr>
+<tr><td class="pname">Seasonality amplitude</td><td class="sym">—</td><td class="units">category</td><td class="desc">Strength of the seasonal forcing on transmission (peak-to-trough), from None to Strong.</td><td class="num">Low</td><td class="num">Strong<br>Moderate<br>Medium<br>Weak<br>Low<br>None</td><td class="rat">Pertussis seasonal forcing is weak relative to strongly seasonal childhood infections (Wearing &amp; Rohani 2009; Fine &amp; Clarkson 1986); &#x27;Low&#x27; (~10% peak-to-trough) is typical.</td><td class="cite"><ul><li>Wearing HJ, Rohani P. Estimating the duration of pertussis immunity using epidemiological signatures. PLoS Pathog. 2009;5(10):e1000647.</li><li>Fine PEM, Clarkson JA. Seasonal influences on pertussis. Int J Epidemiol. 1986;15(2):237–247.</li></ul></td></tr>
       </tbody>
     </table>
   </div>
