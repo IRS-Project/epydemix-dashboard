@@ -8,8 +8,22 @@ MODEL_COMPS = {"SEIR (Measles)": ["S", "E", "I", "R", "V"],
                "SEIRS (Pertussis)": ["S", "E", "I", "R", "Sp", "Ep", "Ip", "Rp"],
                "SEIHR (COVID-19)": ["S", "E", "I", "H", "R", "V"]}
 
+# Seasonality-amplitude choices. The stored value is the plain label (the engine's
+# SEASONALITY_OPTIONS maps it to a trough/peak ratio); the dropdown shows the
+# peak-to-trough swing next to each so the strength is legible. Order runs from
+# strongest to none, matching the engine mapping (Strong 0.50 … None 1.00).
+SEASONALITY_AMPLITUDE_OPTIONS = ["Strong", "Moderate", "Medium", "Weak", "Low", "None"]
+SEASONALITY_AMPLITUDE_LABELS = {
+    "Strong": "Strong — 50% peak-to-trough",
+    "Moderate": "Moderate — 35% peak-to-trough",
+    "Medium": "Medium — 25% peak-to-trough",
+    "Weak": "Weak — 15% peak-to-trough",
+    "Low": "Low — 10% peak-to-trough",
+    "None": "None — flat (0%)",
+}
+
 MODEL_PARAM_SCHEMAS = {
-    
+
     "SEIR (Measles)": [
         {
             "key": "R0",
@@ -89,7 +103,8 @@ MODEL_PARAM_SCHEMAS = {
             "key": "seasonality_amplitude",
             "label": "Seasonality",
             "type": "discrete",
-            "options": ["Strong", "Moderate", "Medium", "Low", "None"],
+            "options": SEASONALITY_AMPLITUDE_OPTIONS,
+            "option_labels": SEASONALITY_AMPLITUDE_LABELS,
             "default": "Medium",
         }
     ],
@@ -254,7 +269,8 @@ MODEL_PARAM_SCHEMAS = {
             "key": "seasonality_amplitude",
             "label": "Seasonality",
             "type": "discrete",
-            "options": ["Strong", "Moderate", "Medium", "Low", "None"],
+            "options": SEASONALITY_AMPLITUDE_OPTIONS,
+            "option_labels": SEASONALITY_AMPLITUDE_LABELS,
             "default": "Low",
             "help": ("Strength of seasonal forcing on the transmission rate (None → Strong). Pertussis "
                      "seasonality is weak, so 'Low' is typical. How to derive: the peak-to-trough "
