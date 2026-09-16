@@ -21,6 +21,10 @@ def render_initial_conditions(model: str, ic_defaults: dict) -> None:
                 max_value=100.0,
                 value=float(st.session_state["initial_conditions"]["infected_pct"]),
                 step=0.1,
+                help=("Percent of the population actively infected at the start (seeds E and I). "
+                      "Keep small for an endemic start (≈ 0.01–0.1%). How to derive: current active "
+                      "case count ÷ population at your start date (inflate modestly for under-reporting). "
+                      "Tactical: (active cases in the county ÷ county population) × 100."),
             )
 
         with c2:
@@ -30,6 +34,11 @@ def render_initial_conditions(model: str, ic_defaults: dict) -> None:
                 max_value=100.0,
                 value=float(st.session_state["initial_conditions"]["immune_pct"]),
                 step=0.1,
+                help=("Percent with any prior immunity at the start (fills the recovered / partially-"
+                      "immune pools). In a mature vaccination program this is high. How to derive: "
+                      "vaccination coverage combined with age-specific seroprevalence for your population. "
+                      "Tactical: ≈ up-to-date vaccination coverage % from your IIS (optionally add the "
+                      "% recently infected)."),
             )
 
         if infected_pct + immune_pct > 100.0:
@@ -52,7 +61,11 @@ def render_initial_conditions(model: str, ic_defaults: dict) -> None:
                     max_value=100.0,
                     value=float(st.session_state["initial_conditions"].get("partial_infection_pct", 33.0)),
                     step=1.0,
-                    help="Share of the initial infections seeded in the partial-immunity track (Eₚ/Iₚ) rather than the naive track (E/I).",
+                    help=("Of the seeded infections, the share placed in the partial-immunity track "
+                          "(Eₚ/Iₚ) rather than the naive track (E/I). How to derive: the "
+                          "vaccinated-up-to-date share of your current/observed cases. "
+                          "Tactical: = up-to-date cases ÷ (up-to-date + not-up-to-date cases) × 100, "
+                          "from the vaccination-status column of your case line list."),
                 )
 
             with c4:
@@ -62,7 +75,12 @@ def render_initial_conditions(model: str, ic_defaults: dict) -> None:
                     max_value=100.0,
                     value=float(st.session_state["initial_conditions"].get("partial_immune_pct", 71.0)),
                     step=1.0,
-                    help="Share of the background-immunity pool placed in partially-susceptible Sₚ. The remainder is split between Rₚ and R.",
+                    help=("Of the background-immunity pool, the share placed in partially-susceptible "
+                          "Sₚ (the rest split between recovered Rₚ and R). Higher in a mature program "
+                          "where most immunity has waned to 'partial'. How to derive: the fraction of "
+                          "the immune population whose protection is waned/vaccine-derived rather than "
+                          "recently infected. Tactical: ≈ vaccinated (IIS) ÷ (vaccinated + cases in the "
+                          "last ~1 year) × 100 — coverage-dominated in a mature program."),
                 )
 
             st.session_state["initial_conditions"]["partial_infection_pct"] = float(partial_infection_pct)

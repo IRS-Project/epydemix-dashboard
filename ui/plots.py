@@ -5,7 +5,8 @@ import altair as alt
 import plotly.express as px
 
 def plot_contact_matrix(
-    layer, matrices, groups, facecolor="#0c1019", cmap="copper"
+    layer, matrices, groups, facecolor="#0c1019",
+    cmap=("#9fb6d4", "#e9e4dd", "#e8933f"),  # light blue -> neutral -> orange
 ):
     """Altair heatmap of a contact matrix with per-cell annotations."""
 
@@ -23,7 +24,7 @@ def plot_contact_matrix(
          for i in range(n) for j in range(n)]
     )
 
-    color_scale = alt.Scale(scheme=cmap) if isinstance(cmap, str) else alt.Scale(range=cmap)
+    color_scale = alt.Scale(scheme=cmap) if isinstance(cmap, str) else alt.Scale(range=list(cmap))
 
     # Domain from data range
     vmin, vmax = float(df["Value"].min()), float(df["Value"].max())
@@ -50,7 +51,21 @@ def plot_contact_matrix(
     heat = base.mark_rect(
         stroke="white", strokeWidth=0.5  # grid lines between cells
     ).encode(
-        color=alt.Color("Value:Q", scale=color_scale, legend=None),
+        color=alt.Color(
+            "Value:Q",
+            scale=color_scale,
+            legend=alt.Legend(
+                title="Contacts",
+                orient="right",          # colorbar to the right of the matrix
+                direction="vertical",
+                gradientLength=500,
+                gradientThickness=18,
+                labelColor="white",
+                titleColor="white",
+                labelFontSize=13,
+                titleFontSize=13,
+            ),
+        ),
         tooltip=[
             alt.Tooltip("Contacting:N"),
             alt.Tooltip("Contacted:N"),
@@ -59,8 +74,9 @@ def plot_contact_matrix(
     )
 
     # --- annotation layer (values in cells) ---
+    # Dark text: the light blue/orange palette needs a dark label to stay legible.
     text = base.mark_text(
-        color="white", fontSize=15
+        color="#1a1a1a", fontSize=15
     ).encode(
         text=alt.Text("Value:Q", format=".2f")
     )
